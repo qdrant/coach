@@ -1,7 +1,7 @@
 mod args;
+mod common;
 mod drill;
 mod drills;
-mod generators;
 
 use crate::drill::run_drills;
 use args::Args;

@@ -3,53 +3,53 @@ use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CollectionStatus, CreateCollection, Distance, PointId, PointStruct, SearchPoints,
-    VectorParams, VectorsConfig,
+    CreateCollection, Distance, PointId, PointStruct, SearchPoints, SearchResponse, VectorParams,
+    VectorsConfig,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::sleep;
 
+use crate::common::client::wait_index;
+use crate::common::generators::{random_filter, random_payload, random_vector};
 use crate::drill::Drill;
-use crate::generators::{random_filter, random_payload, random_vector};
 use async_trait::async_trait;
 
 /// Drill that performs search requests on a collection.
-/// The collection is created and populated with random data if it does not exit.
-pub struct Search {
+/// The collection is created and populated with random data if it does not exist.
+pub struct PointsSearch {
     client: Arc<QdrantClient>,
     collection_name: String,
     search_count: usize,
-    vector_count: usize,
+    points_count: usize,
     vec_dim: usize,
     payload_count: usize,
     stopped: Arc<AtomicBool>,
 }
 
-impl Search {
+impl PointsSearch {
     pub fn new(client: Arc<QdrantClient>, stopped: Arc<AtomicBool>) -> Self {
-        let collection_name = "search-drill".to_string();
+        let collection_name = "points-search-drill".to_string();
         let vec_dim = 128;
         let payload_count = 2;
         let search_count = 1000;
-        let vector_count = 10000;
-        Search {
+        let points_count = 10000;
+        PointsSearch {
             client,
             collection_name,
             search_count,
-            vector_count,
+            points_count,
             vec_dim,
             payload_count,
             stopped,
         }
     }
 
-    pub async fn search(&self) -> Result<(), anyhow::Error> {
+    pub async fn search(&self) -> Result<SearchResponse, anyhow::Error> {
         let query_vector = random_vector(self.vec_dim);
         let query_filter = random_filter(Some(self.payload_count));
 
-        self.client
+        let response = self
+            .client
             .search_points(&SearchPoints {
                 collection_name: self.collection_name.to_string(),
                 vector: query_vector,
@@ -64,33 +64,12 @@ impl Search {
             })
             .await?;
 
-        Ok(())
-    }
-
-    async fn wait_index(&self) -> Result<f64> {
-        let start = std::time::Instant::now();
-        let mut seen = 0;
-        loop {
-            if self.stopped.load(Ordering::Relaxed) {
-                return Ok(0.0);
-            }
-            sleep(Duration::from_secs(1)).await;
-            let info = self.client.collection_info(&self.collection_name).await?;
-            if info.result.unwrap().status == CollectionStatus::Green as i32 {
-                seen += 1;
-                if seen == 3 {
-                    break;
-                }
-            } else {
-                seen = 1;
-            }
-        }
-        Ok(start.elapsed().as_secs_f64())
+        Ok(response)
     }
 
     pub async fn insert_points(&self) -> Result<(), anyhow::Error> {
         let batch_size = 100;
-        let num_batches = self.vector_count / batch_size;
+        let num_batches = self.points_count / batch_size;
 
         for batch_id in 0..num_batches {
             let mut points = Vec::new();
@@ -121,9 +100,9 @@ impl Search {
 }
 
 #[async_trait]
-impl Drill for Search {
+impl Drill for PointsSearch {
     fn name(&self) -> String {
-        "search-drill".to_string()
+        "points_search".to_string()
     }
 
     fn reschedule_after_sec(&self) -> u64 {
@@ -151,14 +130,34 @@ impl Drill for Search {
             self.insert_points().await?;
         }
 
-        self.wait_index().await?;
+        // waiting for green status
+        wait_index(
+            self.client.clone(),
+            &self.collection_name,
+            self.stopped.clone(),
+        )
+        .await?;
+
+        // assert point count
+        let collection_info = self
+            .client
+            .collection_info(&self.collection_name)
+            .await?
+            .result
+            .unwrap();
+        if collection_info.points_count != self.points_count as u64 {
+            return Err(anyhow::anyhow!("Collection has wrong number of points"));
+        }
 
         // search
         for _i in 0..self.search_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Ok(());
             }
-            self.search().await?;
+            let response = self.search().await?;
+            if response.result.is_empty() {
+                return Err(anyhow::anyhow!("Search returned empty result"));
+            }
         }
 
         Ok(())

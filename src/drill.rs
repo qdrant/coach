@@ -1,6 +1,7 @@
 use crate::args::Args;
 use crate::drills::collection_churn::CollectionChurn;
-use crate::drills::search::Search;
+use crate::drills::points_churn::PointsChurn;
+use crate::drills::points_search::PointsSearch;
 use crate::get_config;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -28,15 +29,20 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
     // all drills to run
     let all_drills: Vec<Box<dyn Drill>> = vec![
         Box::new(CollectionChurn::new(client_arc.clone(), stopped.clone())),
-        Box::new(Search::new(client_arc, stopped.clone())),
+        Box::new(PointsSearch::new(client_arc.clone(), stopped.clone())),
+        Box::new(PointsChurn::new(client_arc, stopped.clone())),
     ];
 
     let mut drill_tasks = vec![];
 
-    println!("Scheduling {} drills:", all_drills.len());
+    println!(
+        "Coach scheduling {} drills against {}:",
+        all_drills.len(),
+        args.uri
+    );
     for drill in &all_drills {
         println!(
-            "{} after {} seconds",
+            "- {} (repeating after {} seconds)",
             drill.name(),
             drill.reschedule_after_sec()
         );
@@ -58,7 +64,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                         println!("...{} completed: {:?}", name, execution_start.elapsed());
                     }
                     Err(e) => {
-                        println!("Drill {} failed: {}", name, e);
+                        eprintln!("Drill {} failed: {}", name, e);
                     }
                 }
                 let reschedule_start = Instant::now();

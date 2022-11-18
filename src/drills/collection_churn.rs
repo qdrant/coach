@@ -44,7 +44,7 @@ impl Drill for CollectionChurn {
             match self.client.delete_collection(&self.collection_name).await {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("Failed to delete collection: {}", e);
+                    return Err(anyhow::anyhow!("Failed to delete collection: {}", e));
                 }
             }
         }
@@ -81,7 +81,7 @@ impl Drill for CollectionChurn {
         match self.client.delete_collection(&self.collection_name).await {
             Ok(_) => {}
             Err(e) => {
-                println!("Failed to delete collection: {}", e);
+                return Err(anyhow::anyhow!("Failed to delete collection: {}", e));
             }
         }
 
