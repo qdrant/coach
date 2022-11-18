@@ -39,7 +39,7 @@ impl Drill for CollectionChurn {
     }
 
     async fn run(&self) -> Result<()> {
-        // delete if exists
+        // delete if already exists
         if self.client.has_collection(&self.collection_name).await? {
             match self.client.delete_collection(&self.collection_name).await {
                 Ok(_) => {}
@@ -54,10 +54,6 @@ impl Drill for CollectionChurn {
         }
 
         sleep(Duration::from_secs(1)).await;
-
-        if self.stopped.load(Ordering::Relaxed) {
-            return Ok(());
-        }
 
         self.client
             .create_collection(&CreateCollection {

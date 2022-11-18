@@ -83,9 +83,9 @@ impl Drill for PointsChurn {
     }
 
     async fn run(&self) -> Result<()> {
-        // create if does not exists
+        // create and populate collection if it does not exists
         if !self.client.has_collection(&self.collection_name).await? {
-            println!("The points search drills needs to setup the collection first");
+            println!("The points churn drill needs to setup the collection first");
             self.client
                 .create_collection(&CreateCollection {
                     collection_name: self.collection_name.to_string(),

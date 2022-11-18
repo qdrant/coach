@@ -2,6 +2,7 @@ use crate::args::Args;
 use crate::drills::collection_churn::CollectionChurn;
 use crate::drills::points_churn::PointsChurn;
 use crate::drills::points_search::PointsSearch;
+use crate::drills::points_upsert::PointsUpdate;
 use crate::get_config;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -30,7 +31,8 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
     let all_drills: Vec<Box<dyn Drill>> = vec![
         Box::new(CollectionChurn::new(client_arc.clone(), stopped.clone())),
         Box::new(PointsSearch::new(client_arc.clone(), stopped.clone())),
-        Box::new(PointsChurn::new(client_arc, stopped.clone())),
+        Box::new(PointsChurn::new(client_arc.clone(), stopped.clone())),
+        Box::new(PointsUpdate::new(client_arc, stopped.clone())),
     ];
 
     let mut drill_tasks = vec![];
