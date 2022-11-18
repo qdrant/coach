@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use qdrant_client::client::QdrantClient;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tokio::time::Instant;
 
 /// A drill is a single test that is run periodically
@@ -51,24 +52,37 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
     }
     println!();
 
+    // control the max number of concurrent drills running
+    let max_drill_semaphore = Arc::new(Semaphore::new(args.parallel_drills));
+
     // run drills
     for drill in all_drills {
         let stopped = stopped.clone();
+        let drill_semaphore = max_drill_semaphore.clone();
+        let drill_name = drill.name();
+        let delay_seconds = drill.reschedule_after_sec();
+
         let task = tokio::spawn(async move {
             while !stopped.load(Ordering::Relaxed) {
-                let name = drill.name();
-                let delay_seconds = drill.reschedule_after_sec();
-                println!("Running {}", name);
+                // acquire semaphore to run
+                let run_permit = drill_semaphore.acquire().await.unwrap();
+                println!("Running {}", drill_name);
                 let execution_start = Instant::now();
                 let result = drill.run().await;
                 match result {
                     Ok(_) => {
-                        println!("...{} completed: {:?}", name, execution_start.elapsed());
+                        println!(
+                            "...{} completed: {:?}",
+                            drill_name,
+                            execution_start.elapsed()
+                        );
                     }
                     Err(e) => {
-                        eprintln!("Drill {} failed: {}", name, e);
+                        eprintln!("Drill {} failed: {}", drill_name, e);
                     }
                 }
+                // release semaphore while waiting for reschedule
+                drop(run_permit);
                 let reschedule_start = Instant::now();
                 while reschedule_start.elapsed().as_secs() < delay_seconds {
                     if stopped.load(Ordering::Relaxed) {
