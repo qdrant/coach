@@ -99,3 +99,27 @@ pub async fn create_collection(
         .await?;
     Ok(())
 }
+
+/// delete collection without checking if it exists
+pub async fn delete_collection(
+    client: Arc<QdrantClient>,
+    collection_name: &str,
+) -> Result<(), anyhow::Error> {
+    match client.delete_collection(&collection_name).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!("Failed to delete collection: {}", e)),
+    }
+}
+
+/// delete collection if exists & create new one
+pub async fn recreate_collection(
+    client: Arc<QdrantClient>,
+    collection_name: &str,
+    args: Arc<Args>,
+) -> Result<(), anyhow::Error> {
+    if client.has_collection(&collection_name).await? {
+        println!("Recreating existing collection {}", collection_name);
+        delete_collection(client.clone(), collection_name).await?;
+    }
+    create_collection(client, collection_name, args).await
+}

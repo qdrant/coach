@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::args::Args;
-use crate::common::client::{create_collection, get_points_count, wait_index};
+use crate::common::client::{create_collection, get_points_count, recreate_collection, wait_index};
 use crate::common::generators::{random_payload, random_vector};
 use crate::drill::Drill;
 use async_trait::async_trait;
@@ -122,6 +122,16 @@ impl Drill for PointsUpdate {
             ));
         }
 
+        Ok(())
+    }
+
+    async fn before_all(&self, args: Arc<Args>) -> Result<()> {
+        // honor args.recreate_collection
+        if args.recreate_collection {
+            recreate_collection(self.client.clone(), &self.collection_name, args.clone()).await?;
+            // index some points
+            self.insert_points().await?;
+        }
         Ok(())
     }
 }

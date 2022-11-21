@@ -1,5 +1,5 @@
 use crate::args::Args;
-use crate::common::client::create_collection;
+use crate::common::client::{create_collection, delete_collection};
 use anyhow::Result;
 use async_trait::async_trait;
 use qdrant_client::client::QdrantClient;
@@ -41,12 +41,7 @@ impl Drill for CollectionChurn {
     async fn run(&self, args: Arc<Args>) -> Result<()> {
         // delete if already exists
         if self.client.has_collection(&self.collection_name).await? {
-            match self.client.delete_collection(&self.collection_name).await {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(anyhow::anyhow!("Failed to delete collection: {}", e));
-                }
-            }
+            delete_collection(self.client.clone(), &self.collection_name).await?;
         }
 
         if self.stopped.load(Ordering::Relaxed) {
@@ -63,13 +58,14 @@ impl Drill for CollectionChurn {
 
         sleep(Duration::from_secs(1)).await;
 
-        match self.client.delete_collection(&self.collection_name).await {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(anyhow::anyhow!("Failed to delete collection: {}", e));
-            }
-        }
+        delete_collection(self.client.clone(), &self.collection_name).await?;
 
+        Ok(())
+    }
+
+    async fn before_all(&self, _args: Arc<Args>) -> Result<()> {
+        // no need to explicitly honor args.recreate_collection
+        // because we are going to delete the collection anyway
         Ok(())
     }
 }

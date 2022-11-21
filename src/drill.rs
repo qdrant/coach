@@ -21,6 +21,8 @@ pub trait Drill: Send + Sync {
     fn reschedule_after_sec(&self) -> u64;
     // run drill
     async fn run(&self, args: Arc<Args>) -> Result<()>;
+    // run before the first run
+    async fn before_all(&self, args: Arc<Args>) -> Result<()>;
 }
 
 pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
@@ -64,6 +66,14 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
         let delay_seconds = drill.reschedule_after_sec();
         let args_arc = args_arc.clone();
         let task = tokio::spawn(async move {
+            // before drill
+            let before_res = drill.before_all(args_arc.clone()).await;
+            if let Err(e) = before_res {
+                println!("Drill {} failed to run before_all: {}", drill_name, e);
+                return;
+            }
+
+            // loop drill run
             while !stopped.load(Ordering::Relaxed) {
                 // acquire semaphore to run
                 let run_permit = drill_semaphore.acquire().await.unwrap();
