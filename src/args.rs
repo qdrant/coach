@@ -10,4 +10,10 @@ pub struct Args {
     /// Number of parallel drills to run
     #[clap(short, long, default_value_t = 3)]
     pub parallel_drills: usize,
+    /// Replication factor for collections
+    #[clap(short, long, default_value_t = 1)]
+    pub replication_factor: usize,
+    /// Optimizer indexing threshold
+    #[clap(short, long)]
+    pub indexing_threshold: Option<usize>,
 }

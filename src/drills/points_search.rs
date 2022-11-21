@@ -1,15 +1,12 @@
 use anyhow::Result;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
-use qdrant_client::qdrant::vectors_config::Config;
-use qdrant_client::qdrant::{
-    CreateCollection, Distance, PointId, PointStruct, SearchPoints, SearchResponse, VectorParams,
-    VectorsConfig,
-};
+use qdrant_client::qdrant::{PointId, PointStruct, SearchPoints, SearchResponse};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use crate::common::client::{get_points_count, wait_index};
+use crate::args::Args;
+use crate::common::client::{create_collection, get_points_count, wait_index};
 use crate::common::generators::{random_filter, random_payload, random_vector};
 use crate::drill::Drill;
 use async_trait::async_trait;
@@ -109,22 +106,11 @@ impl Drill for PointsSearch {
         10
     }
 
-    async fn run(&self) -> Result<()> {
+    async fn run(&self, args: Arc<Args>) -> Result<()> {
         // create and populate collection if it does not exists
         if !self.client.has_collection(&self.collection_name).await? {
             println!("The search drill needs to setup the collection first");
-            self.client
-                .create_collection(&CreateCollection {
-                    collection_name: self.collection_name.to_string(),
-                    vectors_config: Some(VectorsConfig {
-                        config: Some(Config::Params(VectorParams {
-                            size: 128,
-                            distance: Distance::Cosine.into(),
-                        })),
-                    }),
-                    ..Default::default()
-                })
-                .await?;
+            create_collection(self.client.clone(), &self.collection_name, args.clone()).await?;
 
             // index some points
             self.insert_points().await?;

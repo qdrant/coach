@@ -20,7 +20,7 @@ pub trait Drill: Send + Sync {
     // delay between runs
     fn reschedule_after_sec(&self) -> u64;
     // run drill
-    async fn run(&self) -> Result<()>;
+    async fn run(&self, args: Arc<Args>) -> Result<()>;
 }
 
 pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
@@ -54,6 +54,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
 
     // control the max number of concurrent drills running
     let max_drill_semaphore = Arc::new(Semaphore::new(args.parallel_drills));
+    let args_arc = Arc::new(args);
 
     // run drills
     for drill in all_drills {
@@ -61,14 +62,14 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
         let drill_semaphore = max_drill_semaphore.clone();
         let drill_name = drill.name();
         let delay_seconds = drill.reschedule_after_sec();
-
+        let args_arc = args_arc.clone();
         let task = tokio::spawn(async move {
             while !stopped.load(Ordering::Relaxed) {
                 // acquire semaphore to run
                 let run_permit = drill_semaphore.acquire().await.unwrap();
                 println!("Running {}", drill_name);
                 let execution_start = Instant::now();
-                let result = drill.run().await;
+                let result = drill.run(args_arc.clone()).await;
                 match result {
                     Ok(_) => {
                         println!(

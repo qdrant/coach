@@ -1,7 +1,12 @@
+use crate::args::Args;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
-use qdrant_client::qdrant::{CollectionStatus, PointId, PointsIdsList, PointsSelector};
+use qdrant_client::qdrant::vectors_config::Config;
+use qdrant_client::qdrant::{
+    CollectionStatus, CreateCollection, Distance, OptimizersConfigDiff, PointId, PointsIdsList,
+    PointsSelector, VectorParams, VectorsConfig,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -68,4 +73,29 @@ pub async fn wait_index(
         }
     }
     Ok(start.elapsed().as_secs_f64())
+}
+
+pub async fn create_collection(
+    client: Arc<QdrantClient>,
+    collection_name: &str,
+    args: Arc<Args>,
+) -> Result<(), anyhow::Error> {
+    client
+        .create_collection(&CreateCollection {
+            collection_name: collection_name.to_string(),
+            vectors_config: Some(VectorsConfig {
+                config: Some(Config::Params(VectorParams {
+                    size: 128,
+                    distance: Distance::Cosine.into(),
+                })),
+            }),
+            replication_factor: Some(args.replication_factor as u32),
+            optimizers_config: Some(OptimizersConfigDiff {
+                indexing_threshold: args.indexing_threshold.map(|i| i as u64),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await?;
+    Ok(())
 }

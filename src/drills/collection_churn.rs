@@ -1,8 +1,8 @@
+use crate::args::Args;
+use crate::common::client::create_collection;
 use anyhow::Result;
 use async_trait::async_trait;
 use qdrant_client::client::QdrantClient;
-use qdrant_client::qdrant::vectors_config::Config;
-use qdrant_client::qdrant::{CreateCollection, Distance, VectorParams, VectorsConfig};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,7 +38,7 @@ impl Drill for CollectionChurn {
         10
     }
 
-    async fn run(&self) -> Result<()> {
+    async fn run(&self, args: Arc<Args>) -> Result<()> {
         // delete if already exists
         if self.client.has_collection(&self.collection_name).await? {
             match self.client.delete_collection(&self.collection_name).await {
@@ -55,18 +55,7 @@ impl Drill for CollectionChurn {
 
         sleep(Duration::from_secs(1)).await;
 
-        self.client
-            .create_collection(&CreateCollection {
-                collection_name: self.collection_name.to_string(),
-                vectors_config: Some(VectorsConfig {
-                    config: Some(Config::Params(VectorParams {
-                        size: 128,
-                        distance: Distance::Cosine.into(),
-                    })),
-                }),
-                ..Default::default()
-            })
-            .await?;
+        create_collection(self.client.clone(), &self.collection_name, args.clone()).await?;
 
         if self.stopped.load(Ordering::Relaxed) {
             return Ok(());
