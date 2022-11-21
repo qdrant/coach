@@ -16,7 +16,7 @@ pub struct Args {
     /// Optimizer indexing threshold
     #[clap(short, long)]
     pub indexing_threshold: Option<usize>,
-    /// Always create collection before each drill
+    /// Always create collection before the first run of a drill
     #[clap(long, default_value_t = false)]
     pub recreate_collection: bool,
 }

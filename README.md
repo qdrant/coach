@@ -18,7 +18,7 @@ Options:
   -p, --parallel-drills <PARALLEL_DRILLS>        Number of parallel drills to run [default: 3]
   -r, --replication-factor <REPLICATION_FACTOR>  Replication factor for collections [default: 1]
   -i, --indexing-threshold <INDEXING_THRESHOLD>  Optimizer indexing threshold
-      --recreate-collection                      Always create collection before each drill
+      --recreate-collection                      Always create collection before the first run of a drill
   -h, --help                                     Print help information
   -V, --version                                  Print version information
 ```
