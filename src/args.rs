@@ -19,4 +19,7 @@ pub struct Args {
     /// Always create collection before the first run of a drill
     #[clap(long, default_value_t = false)]
     pub recreate_collection: bool,
+    /// Stop all drills at the first error encountered
+    #[clap(long, default_value_t = false)]
+    pub stop_at_first_error: bool,
 }

@@ -69,7 +69,15 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
             // before drill
             let before_res = drill.before_all(args_arc.clone()).await;
             if let Err(e) = before_res {
-                eprintln!("Drill {} failed to run before_all: {}", drill_name, e);
+                eprintln!(
+                    "ERROR: Drill {} failed to run before_all\ncaused by {}",
+                    drill_name, e
+                );
+                if args_arc.stop_at_first_error {
+                    eprintln!("Stopping coach because stop_at_first_error is set");
+                    stopped.store(true, Ordering::Relaxed);
+                }
+                // stop drill
                 return;
             }
 
@@ -89,7 +97,10 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                         );
                     }
                     Err(e) => {
-                        eprintln!("Drill {} failed: {}", drill_name, e);
+                        eprintln!("ERROR: Drill {} failed\ncaused by {}", drill_name, e);
+                        if args_arc.stop_at_first_error {
+                            stopped.store(true, Ordering::Relaxed);
+                        }
                     }
                 }
                 // release semaphore while waiting for reschedule

@@ -123,6 +123,7 @@ pub async fn recreate_collection(
     if client.has_collection(&collection_name).await? {
         println!("Recreating existing collection {}", collection_name);
         delete_collection(client.clone(), collection_name).await?;
+        sleep(Duration::from_secs(1)).await;
     }
     create_collection(client, collection_name, args).await
 }
