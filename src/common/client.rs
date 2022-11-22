@@ -80,7 +80,7 @@ pub async fn create_collection(
     collection_name: &str,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
-    client
+    match client
         .create_collection(&CreateCollection {
             collection_name: collection_name.to_string(),
             vectors_config: Some(VectorsConfig {
@@ -96,8 +96,11 @@ pub async fn create_collection(
             }),
             ..Default::default()
         })
-        .await?;
-    Ok(())
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!("Failed to create collection: {}", e)),
+    }
 }
 
 /// delete collection without checking if it exists

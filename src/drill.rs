@@ -69,7 +69,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
             // before drill
             let before_res = drill.before_all(args_arc.clone()).await;
             if let Err(e) = before_res {
-                println!("Drill {} failed to run before_all: {}", drill_name, e);
+                eprintln!("Drill {} failed to run before_all: {}", drill_name, e);
                 return;
             }
 
