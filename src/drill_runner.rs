@@ -35,7 +35,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
         Box::new(CollectionChurn::new(client_arc.clone(), stopped.clone())),
         Box::new(PointsSearch::new(client_arc.clone(), stopped.clone())),
         Box::new(PointsChurn::new(client_arc.clone(), stopped.clone())),
-        Box::new(PointsUpdate::new(client_arc, stopped.clone())),
+        Box::new(PointsUpdate::new(client_arc.clone(), stopped.clone())),
     ];
 
     let mut drill_tasks = vec![];

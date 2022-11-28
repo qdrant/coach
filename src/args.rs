@@ -4,9 +4,12 @@ use clap::Parser;
 #[derive(Parser, Debug, Clone)]
 #[clap(version, about)]
 pub struct Args {
-    /// Qdrant service URI
+    /// Qdrant gRPC service URI
     #[clap(long, default_value = "http://localhost:6334")]
     pub uri: String,
+    /// Qdrant HTTP service URI
+    #[clap(long, default_value = "http://localhost:6333")]
+    pub http_uri: String,
     /// Number of parallel drills to run
     #[clap(short, long, default_value_t = 3)]
     pub parallel_drills: usize,

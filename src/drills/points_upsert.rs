@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::args::Args;
 use crate::common::client::{create_collection, get_points_count, recreate_collection, wait_index};
 use crate::common::generators::{random_payload, random_vector};
-use crate::drill::Drill;
+use crate::drill_runner::Drill;
 use async_trait::async_trait;
 
 /// Drill that performs consistently update the same points.

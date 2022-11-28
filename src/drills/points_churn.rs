@@ -10,7 +10,7 @@ use crate::common::client::{
     create_collection, delete_points, get_points_count, recreate_collection, wait_index,
 };
 use crate::common::generators::{random_payload, random_vector};
-use crate::drill::Drill;
+use crate::drill_runner::Drill;
 use async_trait::async_trait;
 
 /// Drill that creates and deletes points in a collection.

@@ -1,14 +1,16 @@
 mod args;
 mod common;
-mod drill;
+mod drill_runner;
 mod drills;
+mod healthcheck;
 
-use crate::drill::run_drills;
+use crate::drill_runner::run_drills;
 use args::Args;
 use clap::Parser;
 use qdrant_client::client::QdrantClientConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use crate::healthcheck::run_healthcheck;
 
 #[tokio::main]
 async fn main() {
@@ -22,7 +24,11 @@ async fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
+    // start healthcheck
+    let healthcheck_handle = run_healthcheck(args.clone(), stopped.clone()).await.unwrap();
+    // start drills
     run_drills(args, stopped).await.unwrap();
+    healthcheck_handle.await.unwrap();
 }
 
 fn get_config(args: &Args) -> QdrantClientConfig {

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
-use crate::drill::Drill;
+use crate::drill_runner::Drill;
 
 /// Drill that keeps on creating and deleting the same collection
 pub struct CollectionChurn {
