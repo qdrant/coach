@@ -6,6 +6,7 @@ use crate::drills::points_upsert::PointsUpdate;
 use crate::get_config;
 use anyhow::Result;
 use async_trait::async_trait;
+use log::debug;
 use log::error;
 use log::info;
 use log::warn;
@@ -48,7 +49,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
     let mut drill_tasks = vec![];
 
     info!(
-        "Coach scheduling {} drills against {:?}:",
+        "Coach is scheduling {} drills against {:?}:",
         all_drills.len(),
         args.uris
     );
@@ -61,6 +62,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
     }
     // control the max number of concurrent drills running
     let max_drill_semaphore = Arc::new(Semaphore::new(args.parallel_drills));
+    let uris_len = args.uris.len();
     let args_arc = Arc::new(args);
     let first_uri = &args_arc.uris.first().expect("Not empty per construction");
     let before_client = QdrantClient::new(Some(get_config(first_uri))).await?;
@@ -99,7 +101,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                 let run_permit = drill_semaphore.acquire().await.unwrap();
                 let mut drill_reports = vec![];
                 // run drill against all uri sequentially
-                info!("Starting {}", drill.name());
+                debug!("Starting {}", drill.name());
                 for uri in &args_arc.uris {
                     let drill_client = QdrantClient::new(Some(get_config(uri))).await.unwrap();
                     let execution_start = Instant::now();
@@ -107,30 +109,26 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                     match result {
                         Ok(_) => {
                             if let Some(_prev) = last_errors.remove(uri) {
-                                warn!("{} is running again for {}", drill.name(), uri);
+                                warn!("{} is working again for {}", drill.name(), uri);
                             }
-                            drill_reports.push(
-                                DrillReport {
-                                    uri: uri.to_string(),
-                                    duration: execution_start.elapsed(),
-                                    error: None,
-                                }
-                            );
+                            drill_reports.push(DrillReport {
+                                uri: uri.to_string(),
+                                duration: execution_start.elapsed(),
+                                error: None,
+                            });
                         }
                         Err(e) => {
-                            drill_reports.push(
-                                DrillReport {
-                                    uri: uri.to_string(),
-                                    duration: execution_start.elapsed(),
-                                    error: Some(e.to_string()),
-                                }
-                            );
+                            drill_reports.push(DrillReport {
+                                uri: uri.to_string(),
+                                duration: execution_start.elapsed(),
+                                error: Some(e.to_string()),
+                            });
                             // do not spam logs with the same error
                             if let Some(_prev_error) = last_errors.get(uri) {
                                 last_errors.insert(uri.to_string(), e);
                             } else {
                                 // print warning the first time
-                                warn!("{} failed for the first time for {} (see report)", drill.name(), uri);
+                                warn!("{} started to fail for {}", drill.name(), uri);
                                 last_errors.insert(uri.to_string(), e);
                             }
                         }
@@ -141,10 +139,11 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                 let successful_runs = drill_reports.iter().filter(|r| r.error.is_none()).count();
 
                 if successful_runs == 0 {
-                    let mut display_report = format!("No successful runs for drill {}: ", drill.name());
+                    let mut display_report =
+                        format!("{} failed for all {} uris - ", drill.name(), uris_len);
                     for r in drill_reports {
                         if let Some(e) = r.error {
-                            display_report.push_str(&format!("for {} ({}), ", r.uri, e));
+                            display_report.push_str(&format!("{} ({}), ", r.uri, e));
                         }
                     }
                     error!("{}", display_report);
@@ -152,17 +151,20 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                     if args_arc.stop_at_first_error {
                         stopped.store(true, Ordering::Relaxed);
                     }
-                } else if successful_runs == args_arc.uris.len() {
+                } else if successful_runs == uris_len {
                     info!(
                         "{} finished successfully in {} seconds",
                         drill.name(),
-                        drill_reports.iter().map(|r| r.duration.as_secs()).sum::<u64>()
+                        drill_reports
+                            .iter()
+                            .map(|r| r.duration.as_secs())
+                            .sum::<u64>()
                     );
                 } else {
-                    let mut display_report = format!("{} failed partially: ", drill.name());
+                    let mut display_report = format!("{} failed partially - ", drill.name());
                     for r in drill_reports {
                         if let Some(e) = r.error {
-                            display_report.push_str(&format!("for {} ({}), ", r.uri, e));
+                            display_report.push_str(&format!("{} ({}), ", r.uri, e));
                         }
                     }
                     info!("{}", display_report);
