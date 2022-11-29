@@ -6,6 +6,9 @@ use crate::drills::points_upsert::PointsUpdate;
 use crate::get_config;
 use anyhow::Result;
 use async_trait::async_trait;
+use log::error;
+use log::info;
+use log::warn;
 use qdrant_client::client::QdrantClient;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -37,20 +40,18 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
 
     let mut drill_tasks = vec![];
 
-    println!(
+    info!(
         "Coach scheduling {} drills against {:?}:",
         all_drills.len(),
         args.uris
     );
     for drill in &all_drills {
-        println!(
+        info!(
             "- {} (repeating after {} seconds)",
             drill.name(),
             drill.reschedule_after_sec()
         );
     }
-    println!();
-
     // control the max number of concurrent drills running
     let max_drill_semaphore = Arc::new(Semaphore::new(args.parallel_drills));
     let args_arc = Arc::new(args);
@@ -69,13 +70,13 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
             // before drill
             let before_res = drill.before_all(&before_client_arc, args_arc.clone()).await;
             if let Err(e) = before_res {
-                eprintln!(
+                error!(
                     "ERROR: Drill {} failed to run before_all caused by {}",
                     drill.name(),
                     e
                 );
                 if args_arc.stop_at_first_error {
-                    eprintln!("Stopping coach because stop_at_first_error is set");
+                    error!("Stopping coach because stop_at_first_error is set");
                     stopped.store(true, Ordering::Relaxed);
                 }
                 // stop drill
@@ -93,7 +94,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                 let mut at_least_one_successful_run = false;
 
                 // run drill against all uri sequentially
-                println!("Running {}", drill.name());
+                info!("Running {}", drill.name());
                 for uri in &args_arc.uris {
                     let drill_client = QdrantClient::new(Some(get_config(uri))).await.unwrap();
                     let execution_start = Instant::now();
@@ -101,9 +102,9 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                     match result {
                         Ok(_) => {
                             if let Some(_prev) = last_errors.remove(uri) {
-                                println!("...{} is running again for {}", drill.name(), uri);
+                                warn!("...{} is running again for {}", drill.name(), uri);
                             }
-                            println!(
+                            info!(
                                 "...{} completed for {} in {:?}",
                                 drill.name(),
                                 uri,
@@ -116,7 +117,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                             if let Some(_prev_error) = last_errors.get(uri) {
                                 last_errors.insert(uri.to_string(), e);
                             } else {
-                                eprintln!(
+                                error!(
                                     "ERROR: Drill {} failed for {} caused by {}",
                                     drill.name(),
                                     uri,
@@ -129,7 +130,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                 }
 
                 if !at_least_one_successful_run {
-                    eprintln!("ERROR: No successful runs for drill {}", drill.name());
+                    error!("ERROR: No successful runs for drill {}", drill.name());
                     // stop coach in case pf no successful run if configured
                     if args_arc.stop_at_first_error {
                         stopped.store(true, Ordering::Relaxed);

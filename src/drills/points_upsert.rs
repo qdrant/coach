@@ -79,7 +79,7 @@ impl Drill for PointsUpdate {
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
         // create if does not exists
         if !client.has_collection(&self.collection_name).await? {
-            println!("The update drill needs to setup the collection first");
+            log::info!("The update drill needs to setup the collection first");
             create_collection(client, &self.collection_name, args.clone()).await?;
 
             // index some points

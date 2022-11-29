@@ -8,6 +8,7 @@ use crate::drill_runner::run_drills;
 use crate::healthcheck::run_healthcheck;
 use args::Args;
 use clap::Parser;
+use env_logger::Target;
 use qdrant_client::client::QdrantClientConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -15,7 +16,7 @@ use std::sync::Arc;
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-
+    setup_logger();
     let stopped = Arc::new(AtomicBool::new(false));
     let r = stopped.clone();
 
@@ -41,4 +42,15 @@ fn get_config(url: &str) -> QdrantClientConfig {
         config.set_api_key(&api_key);
     }
     config
+}
+
+pub fn setup_logger() {
+    let mut log_builder = env_logger::Builder::new();
+
+    log_builder
+        .target(Target::Stdout)
+        .format_timestamp_millis()
+        .filter_level(log::LevelFilter::Info);
+
+    log_builder.init();
 }

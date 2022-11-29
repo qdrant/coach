@@ -104,7 +104,7 @@ impl Drill for PointsSearch {
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
         // create and populate collection if it does not exists
         if !client.has_collection(&self.collection_name).await? {
-            println!("The search drill needs to setup the collection first");
+            log::info!("The search drill needs to setup the collection first");
             create_collection(client, &self.collection_name, args.clone()).await?;
 
             // index some points
