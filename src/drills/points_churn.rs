@@ -16,7 +16,6 @@ use async_trait::async_trait;
 /// Drill that creates and deletes points in a collection.
 /// The collection is created and populated with random data if it does not exist.
 pub struct PointsChurn {
-    client: Arc<QdrantClient>,
     collection_name: String,
     points_count: usize,
     vec_dim: usize,
@@ -25,13 +24,12 @@ pub struct PointsChurn {
 }
 
 impl PointsChurn {
-    pub fn new(client: Arc<QdrantClient>, stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let collection_name = "points-churn-drill".to_string();
         let vec_dim = 128;
         let payload_count = 2;
         let points_count = 10000;
         PointsChurn {
-            client,
             collection_name,
             points_count,
             vec_dim,
@@ -40,7 +38,7 @@ impl PointsChurn {
         }
     }
 
-    pub async fn insert_points(&self) -> Result<(), anyhow::Error> {
+    pub async fn insert_points(&self, client: &QdrantClient) -> Result<(), anyhow::Error> {
         let batch_size = 100;
         let num_batches = self.points_count / batch_size;
 
@@ -64,7 +62,7 @@ impl PointsChurn {
             }
 
             // push batch
-            self.client
+            client
                 .upsert_points_blocking(&self.collection_name, points)
                 .await?;
         }
@@ -82,26 +80,21 @@ impl Drill for PointsChurn {
         10
     }
 
-    async fn run(&self, args: Arc<Args>) -> Result<()> {
+    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
         // create and populate collection if it does not exists
-        if !self.client.has_collection(&self.collection_name).await? {
+        if !client.has_collection(&self.collection_name).await? {
             println!("The points churn drill needs to setup the collection first");
-            create_collection(self.client.clone(), &self.collection_name, args.clone()).await?;
+            create_collection(client, &self.collection_name, args.clone()).await?;
         }
 
         // index some points
-        self.insert_points().await?;
+        self.insert_points(client).await?;
 
         // waiting for green status
-        wait_index(
-            self.client.clone(),
-            &self.collection_name,
-            self.stopped.clone(),
-        )
-        .await?;
+        wait_index(client, &self.collection_name, self.stopped.clone()).await?;
 
         // assert point count
-        let points_count = get_points_count(self.client.clone(), &self.collection_name).await?;
+        let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != self.points_count {
             return Err(anyhow::anyhow!(
                 "Collection has wrong number of points after insert {} vs {}",
@@ -111,15 +104,10 @@ impl Drill for PointsChurn {
         }
 
         // delete all points
-        delete_points(
-            self.client.clone(),
-            &self.collection_name,
-            self.points_count,
-        )
-        .await?;
+        delete_points(client, &self.collection_name, self.points_count).await?;
 
         // assert point count
-        let points_count = get_points_count(self.client.clone(), &self.collection_name).await?;
+        let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != 0 {
             return Err(anyhow::anyhow!(
                 "Collection should be empty but got {} points",
@@ -130,10 +118,10 @@ impl Drill for PointsChurn {
         Ok(())
     }
 
-    async fn before_all(&self, args: Arc<Args>) -> Result<()> {
+    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
         // honor args.recreate_collection
         if args.recreate_collection {
-            recreate_collection(self.client.clone(), &self.collection_name, args.clone()).await?;
+            recreate_collection(client, &self.collection_name, args.clone()).await?;
         }
         Ok(())
     }

@@ -13,7 +13,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 pub async fn get_points_count(
-    client: Arc<QdrantClient>,
+    client: &QdrantClient,
     collection_name: &str,
 ) -> Result<usize, anyhow::Error> {
     let point_count = client
@@ -26,7 +26,7 @@ pub async fn get_points_count(
 }
 
 pub async fn delete_points(
-    client: Arc<QdrantClient>,
+    client: &QdrantClient,
     collection_name: &str,
     points_count: usize,
 ) -> Result<(), anyhow::Error> {
@@ -51,7 +51,7 @@ pub async fn delete_points(
 }
 
 pub async fn wait_index(
-    client: Arc<QdrantClient>,
+    client: &QdrantClient,
     collection_name: &str,
     stopped: Arc<AtomicBool>,
 ) -> Result<f64, anyhow::Error> {
@@ -76,7 +76,7 @@ pub async fn wait_index(
 }
 
 pub async fn create_collection(
-    client: Arc<QdrantClient>,
+    client: &QdrantClient,
     collection_name: &str,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
@@ -105,7 +105,7 @@ pub async fn create_collection(
 
 /// delete collection without checking if it exists
 pub async fn delete_collection(
-    client: Arc<QdrantClient>,
+    client: &QdrantClient,
     collection_name: &str,
 ) -> Result<(), anyhow::Error> {
     match client.delete_collection(&collection_name).await {
@@ -116,13 +116,13 @@ pub async fn delete_collection(
 
 /// delete collection if exists & create new one
 pub async fn recreate_collection(
-    client: Arc<QdrantClient>,
+    client: &QdrantClient,
     collection_name: &str,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
     if client.has_collection(&collection_name).await? {
         println!("Recreating existing collection {}", collection_name);
-        delete_collection(client.clone(), collection_name).await?;
+        delete_collection(client, collection_name).await?;
         sleep(Duration::from_secs(1)).await;
     }
     create_collection(client, collection_name, args).await

@@ -1,33 +1,51 @@
 # coach
 
-A coach running drills against a qdrant deployment.
+A coach running drills against a qdrant deployment (single node & distributed).
 
-## status
+Those drills are run continuously to detect unexpected behaviors over a long period of time.
 
-WIP
+## drills
+
+- `collection_churn`: drill that keeps on creating and deleting the same collection
+- `points_churn`: drill that creates and deletes points in a collection.
+- `points_search`: drill that performs search requests on a collection.
+- `points_upsert`: drill that consistently updates the same points.
 
 ## usage
 
-```bash
+```text
 Tool for coaching Qdrant instances
 
 Usage: coach [OPTIONS]
 
 Options:
-      --uri <URI>
-          Qdrant service URI [default: http://localhost:6334]
+      --uris <URIS>
+          Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6333]
   -p, --parallel-drills <PARALLEL_DRILLS>
           Number of parallel drills to run [default: 3]
-  -r, --replication-factor <REPLICATION_FACTOR>
+      --replication-factor <REPLICATION_FACTOR>
           Replication factor for collections [default: 1]
-  -i, --indexing-threshold <INDEXING_THRESHOLD>
+      --indexing-threshold <INDEXING_THRESHOLD>
           Optimizer indexing threshold
       --recreate-collection
           Always create collection before the first run of a drill
       --stop-at-first-error
           Stop all drills at the first error encountered
+      --health-check-delay-ms <HEALTH_CHECK_DELAY_MS>
+          Delay between health checks [default: 100]
   -h, --help
           Print help information
   -V, --version
           Print version information
+```
+
+e.g for a distributed deployment
+
+```bash
+./coach --uris "http://localhost:6334" \
+        --uris "http://localhost:6344" \
+        --uris "http://localhost:6354" \
+        --recreate-collection \
+        --replication-factor 2 \
+        --indexing-threshold 1000`
 ```

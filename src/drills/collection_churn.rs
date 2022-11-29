@@ -12,16 +12,14 @@ use crate::drill_runner::Drill;
 
 /// Drill that keeps on creating and deleting the same collection
 pub struct CollectionChurn {
-    client: Arc<QdrantClient>,
     collection_name: String,
     stopped: Arc<AtomicBool>,
 }
 
 impl CollectionChurn {
-    pub fn new(client: Arc<QdrantClient>, stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let collection_name = "collection-churn-drill".to_string();
         CollectionChurn {
-            client,
             collection_name,
             stopped,
         }
@@ -38,10 +36,10 @@ impl Drill for CollectionChurn {
         10
     }
 
-    async fn run(&self, args: Arc<Args>) -> Result<()> {
+    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
         // delete if already exists
-        if self.client.has_collection(&self.collection_name).await? {
-            delete_collection(self.client.clone(), &self.collection_name).await?;
+        if client.has_collection(&self.collection_name).await? {
+            delete_collection(client, &self.collection_name).await?;
         }
 
         if self.stopped.load(Ordering::Relaxed) {
@@ -50,7 +48,7 @@ impl Drill for CollectionChurn {
 
         sleep(Duration::from_secs(1)).await;
 
-        create_collection(self.client.clone(), &self.collection_name, args.clone()).await?;
+        create_collection(client, &self.collection_name, args.clone()).await?;
 
         if self.stopped.load(Ordering::Relaxed) {
             return Ok(());
@@ -58,12 +56,12 @@ impl Drill for CollectionChurn {
 
         sleep(Duration::from_secs(1)).await;
 
-        delete_collection(self.client.clone(), &self.collection_name).await?;
+        delete_collection(client, &self.collection_name).await?;
 
         Ok(())
     }
 
-    async fn before_all(&self, _args: Arc<Args>) -> Result<()> {
+    async fn before_all(&self, _client: &QdrantClient, _args: Arc<Args>) -> Result<()> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())
