@@ -141,7 +141,13 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                 let successful_runs = drill_reports.iter().filter(|r| r.error.is_none()).count();
 
                 if successful_runs == 0 {
-                    error!("No successful runs for drill {}!", drill.name());
+                    let mut display_report = format!("No successful runs for drill {}: ", drill.name());
+                    for r in drill_reports {
+                        if let Some(e) = r.error {
+                            display_report.push_str(&format!("for {} ({}), ", r.uri, e));
+                        }
+                    }
+                    error!("{}", display_report);
                     // stop coach in case pf no successful run if configured
                     if args_arc.stop_at_first_error {
                         stopped.store(true, Ordering::Relaxed);
