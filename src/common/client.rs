@@ -123,9 +123,9 @@ pub async fn recreate_collection(
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
     if client.has_collection(&collection_name).await? {
-        log::info!("Recreating existing collection {}", collection_name);
+        log::info!("recreating existing collection {}", collection_name);
         delete_collection(client, collection_name).await?;
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(3)).await;
     }
     create_collection(client, collection_name, args).await
 }
