@@ -49,3 +49,14 @@ e.g for a distributed deployment
         --replication-factor 2 \
         --indexing-threshold 1000
 ```
+
+## docker
+
+Docker image available on [Docker Hub](https://hub.docker.com/r/qdrant/coach).
+
+```bash
+# Download image
+docker pull qdrant/coach:latest
+# Run the tool
+docker run qdrant/coach ./coach
+```
