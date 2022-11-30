@@ -8,6 +8,8 @@ use crate::args::Args;
 use crate::common::client::{
     create_collection, get_points_count, insert_points, recreate_collection, wait_index,
 };
+use crate::common::coach_errors::CoachError;
+use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
 use crate::common::generators::{random_filter, random_vector};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
@@ -73,7 +75,7 @@ impl Drill for PointsSearch {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
+    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // create and populate collection if it does not exists
         if !client.has_collection(&self.collection_name).await? {
             log::info!("The search drill needs to setup the collection first");
@@ -97,29 +99,28 @@ impl Drill for PointsSearch {
         // assert point count
         let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != self.points_count {
-            return Err(anyhow::anyhow!(
+            return Err(Invariant(format!(
                 "Collection has wrong number of points after insert {} vs {}",
-                points_count,
-                self.points_count
-            ));
+                points_count, self.points_count
+            )));
         }
 
         // search `search_count` times
         for _i in 0..self.search_count {
             if self.stopped.load(Ordering::Relaxed) {
-                return Ok(());
+                return Err(Cancelled);
             }
             let response = self.search(client).await?;
             // assert not empty
             if response.result.is_empty() {
-                return Err(anyhow::anyhow!("Search returned empty result"));
+                return Err(Invariant("Search returned empty result".to_string()));
             }
         }
 
         Ok(())
     }
 
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
+    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, args.clone()).await?;

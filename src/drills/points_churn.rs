@@ -8,6 +8,8 @@ use crate::common::client::{
     create_collection, delete_points, get_points_count, insert_points, recreate_collection,
     wait_index,
 };
+use crate::common::coach_errors::CoachError;
+use crate::common::coach_errors::CoachError::Invariant;
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
 
@@ -47,7 +49,7 @@ impl Drill for PointsChurn {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
+    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // create and populate collection if it does not exists
         if !client.has_collection(&self.collection_name).await? {
             log::info!("The points churn drill needs to setup the collection first");
@@ -71,11 +73,10 @@ impl Drill for PointsChurn {
         // assert point count
         let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != self.points_count {
-            return Err(anyhow::anyhow!(
+            return Err(Invariant(format!(
                 "Collection has wrong number of points after insert {} vs {}",
-                points_count,
-                self.points_count
-            ));
+                points_count, self.points_count
+            )));
         }
 
         // delete all points
@@ -84,16 +85,16 @@ impl Drill for PointsChurn {
         // assert point count
         let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != 0 {
-            return Err(anyhow::anyhow!(
+            return Err(Invariant(format!(
                 "Collection should be empty but got {} points",
                 points_count
-            ));
+            )));
         }
 
         Ok(())
     }
 
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
+    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, args.clone()).await?;

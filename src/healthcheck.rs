@@ -2,7 +2,7 @@ use crate::args::Args;
 use crate::get_config;
 use anyhow::Result;
 use log::error;
-use log::warn;
+use log::info;
 use qdrant_client::client::QdrantClient;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,7 +22,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Joi
                         Ok(_) => {
                             // marking it as healthy
                             if let Some(_prev) = last_errors.remove(uri) {
-                                warn!("{} is healthy again", uri);
+                                info!("{} is healthy again", uri);
                             }
                         }
                         Err(e) => {

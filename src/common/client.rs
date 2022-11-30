@@ -1,4 +1,6 @@
 use crate::args::Args;
+use crate::common::coach_errors::CoachError;
+use crate::common::coach_errors::CoachError::Cancelled;
 use crate::common::generators::{random_payload, random_vector};
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -56,12 +58,12 @@ pub async fn wait_index(
     client: &QdrantClient,
     collection_name: &str,
     stopped: Arc<AtomicBool>,
-) -> Result<f64, anyhow::Error> {
+) -> Result<f64, CoachError> {
     let start = std::time::Instant::now();
     let mut seen = 0;
     loop {
         if stopped.load(Ordering::Relaxed) {
-            return Ok(0.0);
+            return Err(Cancelled);
         }
         sleep(Duration::from_secs(1)).await;
         let info = client.collection_info(&collection_name).await?;
@@ -125,7 +127,7 @@ pub async fn recreate_collection(
     if client.has_collection(&collection_name).await? {
         log::info!("recreating existing collection {}", collection_name);
         delete_collection(client, collection_name).await?;
-        sleep(Duration::from_secs(3)).await;
+        sleep(Duration::from_secs(2)).await;
     }
     create_collection(client, collection_name, args).await
 }
@@ -138,7 +140,7 @@ pub async fn insert_points(
     vec_dim: usize,
     payload_count: usize,
     stopped: Arc<AtomicBool>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), CoachError> {
     let batch_size = 100;
     let num_batches = points_count / batch_size;
 
@@ -158,7 +160,7 @@ pub async fn insert_points(
             ));
         }
         if stopped.load(Ordering::Relaxed) {
-            return Ok(());
+            return Err(Cancelled);
         }
 
         // push batch blocking

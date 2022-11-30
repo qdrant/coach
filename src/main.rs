@@ -21,6 +21,7 @@ async fn main() {
     let r = stopped.clone();
 
     ctrlc::set_handler(move || {
+        log::info!("Coach is stopping");
         r.store(true, Ordering::SeqCst);
     })
     .expect("Error setting Ctrl-C handler");

@@ -1,5 +1,7 @@
 use crate::args::Args;
 use crate::common::client::{create_collection, delete_collection};
+use crate::common::coach_errors::CoachError;
+use crate::common::coach_errors::CoachError::Cancelled;
 use anyhow::Result;
 use async_trait::async_trait;
 use qdrant_client::client::QdrantClient;
@@ -36,14 +38,14 @@ impl Drill for CollectionChurn {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
+    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // delete if already exists
         if client.has_collection(&self.collection_name).await? {
             delete_collection(client, &self.collection_name).await?;
         }
 
         if self.stopped.load(Ordering::Relaxed) {
-            return Ok(());
+            return Err(Cancelled);
         }
 
         sleep(Duration::from_secs(1)).await;
@@ -51,7 +53,7 @@ impl Drill for CollectionChurn {
         create_collection(client, &self.collection_name, args.clone()).await?;
 
         if self.stopped.load(Ordering::Relaxed) {
-            return Ok(());
+            return Err(Cancelled);
         }
 
         sleep(Duration::from_secs(1)).await;
@@ -61,7 +63,7 @@ impl Drill for CollectionChurn {
         Ok(())
     }
 
-    async fn before_all(&self, _client: &QdrantClient, _args: Arc<Args>) -> Result<()> {
+    async fn before_all(&self, _client: &QdrantClient, _args: Arc<Args>) -> Result<(), CoachError> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())

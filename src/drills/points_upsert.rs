@@ -7,6 +7,8 @@ use crate::args::Args;
 use crate::common::client::{
     create_collection, get_points_count, insert_points, recreate_collection, wait_index,
 };
+use crate::common::coach_errors::CoachError;
+use crate::common::coach_errors::CoachError::Invariant;
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
 
@@ -46,7 +48,7 @@ impl Drill for PointsUpdate {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
+    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // create if does not exists
         if !client.has_collection(&self.collection_name).await? {
             log::info!("The update drill needs to setup the collection first");
@@ -73,8 +75,12 @@ impl Drill for PointsUpdate {
             .await?
             .result
             .unwrap();
+
         if collection_info.points_count != self.points_count as u64 {
-            return Err(anyhow::anyhow!("Collection has wrong number of points"));
+            return Err(Invariant(format!(
+                "Collection has wrong number of points after insert {} vs {}",
+                collection_info.points_count, self.points_count
+            )));
         }
 
         // update points by upserting on same ids
@@ -91,17 +97,16 @@ impl Drill for PointsUpdate {
         // assert point count
         let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != self.points_count {
-            return Err(anyhow::anyhow!(
-                "Collection has wrong number of points after insert {} vs {}",
-                points_count,
-                self.points_count
-            ));
+            return Err(Invariant(format!(
+                "Collection has wrong number of points after upsert {} vs {}",
+                points_count, self.points_count
+            )));
         }
 
         Ok(())
     }
 
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<()> {
+    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, args.clone()).await?;
