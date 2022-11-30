@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
 pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<JoinHandle<()>> {
     let healthcheck_task = tokio::spawn(async move {
@@ -18,11 +19,12 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Joi
             // contact all input uris
             for uri in &args.uris {
                 if let Ok(client) = QdrantClient::new(Some(get_config(uri))).await {
+                    let execution_start = Instant::now();
                     match client.health_check().await {
                         Ok(_) => {
                             // marking it as healthy
                             if let Some(_prev) = last_errors.remove(uri) {
-                                info!("{} is healthy again", uri);
+                                info!("{} is healthy again ({:?})", uri, execution_start.elapsed());
                             }
                         }
                         Err(e) => {
@@ -30,7 +32,12 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Joi
                             if let Some(_prev_error) = last_errors.get(uri) {
                                 last_errors.insert(uri.to_string(), e);
                             } else {
-                                error!("healthcheck failed for {} ({})", uri, e);
+                                error!(
+                                    "healthcheck failed for {} after {:?} ({})",
+                                    uri,
+                                    execution_start.elapsed(),
+                                    e
+                                );
                                 last_errors.insert(uri.to_string(), e);
                             }
                         }

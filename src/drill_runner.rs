@@ -141,7 +141,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                     };
                 }
 
-                if drill_reports.is_empty() {
+                if stopped.load(Ordering::Relaxed) {
                     // drill canceled
                     return;
                 }
@@ -150,11 +150,11 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
                 let successful_runs = drill_reports.iter().filter(|r| r.error.is_none()).count();
 
                 if successful_runs == 0 {
-                    let mut display_report =
-                        format!("{} failed for all {} uris - ", drill.name(), uris_len);
+                    let mut display_report = format!("{} failed completely - ", drill.name());
                     for r in drill_reports {
                         if let Some(e) = r.error {
-                            display_report.push_str(&format!("{} ({}), ", r.uri, e));
+                            display_report
+                                .push_str(&format!("{} in {:?} ({}), ", r.uri, r.duration, e));
                         }
                     }
                     error!("{}", display_report);
