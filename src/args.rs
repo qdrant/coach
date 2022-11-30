@@ -5,7 +5,7 @@ use clap::Parser;
 #[command(version, about)]
 pub struct Args {
     /// Qdrant gRPC service URIs (can be used several times to specify several URIs)
-    #[arg(long, default_value = "http://localhost:6333")]
+    #[arg(long, default_value = "http://localhost:6334")]
     pub uris: Vec<String>,
     /// Number of parallel drills to run
     #[arg(short, long, default_value_t = 3)]
@@ -23,6 +23,6 @@ pub struct Args {
     #[arg(long, default_value_t = false)]
     pub stop_at_first_error: bool,
     /// Delay between health checks
-    #[arg(long, default_value_t = 100)]
+    #[arg(long, default_value_t = 200)]
     pub health_check_delay_ms: usize,
 }

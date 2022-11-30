@@ -20,7 +20,7 @@ Usage: coach [OPTIONS]
 
 Options:
       --uris <URIS>
-          Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6333]
+          Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6334]
   -p, --parallel-drills <PARALLEL_DRILLS>
           Number of parallel drills to run [default: 3]
       --replication-factor <REPLICATION_FACTOR>
@@ -32,7 +32,7 @@ Options:
       --stop-at-first-error
           Stop all drills at the first error encountered
       --health-check-delay-ms <HEALTH_CHECK_DELAY_MS>
-          Delay between health checks [default: 100]
+          Delay between health checks [default: 200]
   -h, --help
           Print help information
   -V, --version
@@ -47,5 +47,5 @@ e.g for a distributed deployment
         --uris "http://localhost:6354" \
         --recreate-collection \
         --replication-factor 2 \
-        --indexing-threshold 1000`
+        --indexing-threshold 1000
 ```
