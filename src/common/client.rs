@@ -1,11 +1,12 @@
 use crate::args::Args;
+use crate::common::generators::{random_payload, random_vector};
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CollectionStatus, CreateCollection, Distance, OptimizersConfigDiff, PointId, PointsIdsList,
-    PointsSelector, VectorParams, VectorsConfig,
+    CollectionStatus, CreateCollection, Distance, OptimizersConfigDiff, PointId, PointStruct,
+    PointsIdsList, PointsSelector, VectorParams, VectorsConfig,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -25,6 +26,7 @@ pub async fn get_points_count(
     Ok(point_count as usize)
 }
 
+/// delete points (blocking)
 pub async fn delete_points(
     client: &QdrantClient,
     collection_name: &str,
@@ -126,4 +128,43 @@ pub async fn recreate_collection(
         sleep(Duration::from_secs(1)).await;
     }
     create_collection(client, collection_name, args).await
+}
+
+/// insert points into collection (blocking)
+pub async fn insert_points(
+    client: &QdrantClient,
+    collection_name: &str,
+    points_count: usize,
+    vec_dim: usize,
+    payload_count: usize,
+    stopped: Arc<AtomicBool>,
+) -> Result<(), anyhow::Error> {
+    let batch_size = 100;
+    let num_batches = points_count / batch_size;
+
+    for batch_id in 0..num_batches {
+        let mut points = Vec::new();
+        for i in 0..batch_size {
+            let idx = batch_id as u64 * batch_size as u64 + i as u64;
+
+            let point_id: PointId = PointId {
+                point_id_options: Some(PointIdOptions::Num(idx)),
+            };
+
+            points.push(PointStruct::new(
+                point_id,
+                random_vector(vec_dim),
+                random_payload(Some(payload_count)),
+            ));
+        }
+        if stopped.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+
+        // push batch blocking
+        client
+            .upsert_points_blocking(collection_name, points)
+            .await?;
+    }
+    Ok(())
 }
