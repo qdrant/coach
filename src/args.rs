@@ -28,4 +28,7 @@ pub struct Args {
     /// Delay between health checks
     #[arg(long, default_value_t = 200)]
     pub health_check_delay_ms: usize,
+    /// Name of the drills to ignore
+    #[arg(long)]
+    pub ignored_drills: Vec<String>,
 }

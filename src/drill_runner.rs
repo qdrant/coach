@@ -40,7 +40,7 @@ struct DrillReport {
 }
 
 pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<JoinHandle<()>>> {
-    // all drills to run
+    // all drills known to coach
     let all_drills: Vec<Box<dyn Drill>> = vec![
         Box::new(CollectionChurn::new(stopped.clone())),
         Box::new(PointsSearch::new(stopped.clone())),
@@ -48,14 +48,20 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
         Box::new(PointsUpdate::new(stopped.clone())),
     ];
 
+    // filter drills by name
+    let drills_to_run = all_drills
+        .into_iter()
+        .filter(|d| !args.ignored_drills.contains(&d.name()))
+        .collect::<Vec<_>>();
+
     let mut drill_tasks = vec![];
 
     info!(
         "Coach is scheduling {} drills against {:?}:",
-        all_drills.len(),
+        drills_to_run.len(),
         args.uris
     );
-    for drill in &all_drills {
+    for drill in &drills_to_run {
         info!(
             "- {} (repeating after {} seconds)",
             drill.name(),
@@ -71,7 +77,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     // pick first uri to run before_all
     let before_client_arc = Arc::new(before_client);
     // run drills
-    for drill in all_drills {
+    for drill in drills_to_run {
         let stopped = stopped.clone();
         let drill_semaphore = max_drill_semaphore.clone();
         let args_arc = args_arc.clone();

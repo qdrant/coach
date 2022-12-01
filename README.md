@@ -35,6 +35,8 @@ Options:
           Only run the healtcheck for the input URI, no drills executed
       --health-check-delay-ms <HEALTH_CHECK_DELAY_MS>
           Delay between health checks [default: 200]
+      --ignored-drills <IGNORED_DRILLS>
+          Name of the drills to ignore
   -h, --help
           Print help information
   -V, --version
