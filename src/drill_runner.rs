@@ -17,6 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
+use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 /// A drill is a single test that is run periodically
@@ -38,7 +39,7 @@ struct DrillReport {
     error: Option<String>,
 }
 
-pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
+pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<JoinHandle<()>>> {
     // all drills to run
     let all_drills: Vec<Box<dyn Drill>> = vec![
         Box::new(CollectionChurn::new(stopped.clone())),
@@ -196,9 +197,5 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<()> {
         drill_tasks.push(task);
     }
 
-    for task in drill_tasks {
-        task.await?;
-    }
-
-    Ok(())
+    Ok(drill_tasks)
 }

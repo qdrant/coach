@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     setup_logger();
     let stopped = Arc::new(AtomicBool::new(false));
@@ -26,13 +26,24 @@ async fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
+    let mut handles = vec![];
+
     // start healthcheck
-    let healthcheck_handle = run_healthcheck(args.clone(), stopped.clone())
-        .await
-        .unwrap();
+    let healthcheck_handles = run_healthcheck(args.clone(), stopped.clone()).await?;
+    for handle in healthcheck_handles {
+        handles.push(handle);
+    }
     // start drills
-    run_drills(args, stopped).await.unwrap();
-    healthcheck_handle.await.unwrap();
+    let drill_handles = run_drills(args, stopped).await?;
+    for handle in drill_handles {
+        handles.push(handle);
+    }
+
+    // wait for completion
+    for task in handles {
+        task.await?;
+    }
+    Ok(())
 }
 
 fn get_config(url: &str) -> QdrantClientConfig {
