@@ -33,10 +33,15 @@ async fn main() -> anyhow::Result<()> {
     for handle in healthcheck_handles {
         handles.push(handle);
     }
-    // start drills
-    let drill_handles = run_drills(args, stopped).await?;
-    for handle in drill_handles {
-        handles.push(handle);
+
+    if !args.only_healthcheck {
+        // start drills
+        let drill_handles = run_drills(args, stopped).await?;
+        for handle in drill_handles {
+            handles.push(handle);
+        }
+    } else {
+        log::info!("Only healthcheck is enabled, no drills will be executed");
     }
 
     // wait for completion

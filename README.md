@@ -31,6 +31,8 @@ Options:
           Always create collection before the first run of a drill
       --stop-at-first-error
           Stop all drills at the first error encountered
+      --only-healthcheck
+          Only run the healtcheck for the input URI, no drills executed
       --health-check-delay-ms <HEALTH_CHECK_DELAY_MS>
           Delay between health checks [default: 200]
   -h, --help

@@ -22,6 +22,9 @@ pub struct Args {
     /// Stop all drills at the first error encountered
     #[arg(long, default_value_t = false)]
     pub stop_at_first_error: bool,
+    /// Only run the healtcheck for the input URI, no drills executed.
+    #[arg(long, default_value_t = false)]
+    pub only_healthcheck: bool,
     /// Delay between health checks
     #[arg(long, default_value_t = 200)]
     pub health_check_delay_ms: usize,
