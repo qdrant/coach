@@ -17,3 +17,4 @@ rand = "0.8.5"
 tokio = { version = "1.22.0", features = ["full"] }
 log = "0.4.14"
 env_logger = "0.10.0"
+hdrhistogram = "7.5.2"

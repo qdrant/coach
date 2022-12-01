@@ -1,6 +1,7 @@
 use crate::args::Args;
 use crate::get_config;
 use anyhow::Result;
+use hdrhistogram::Histogram;
 use log::error;
 use log::info;
 use qdrant_client::client::QdrantClient;
@@ -19,6 +20,8 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
         let handle = tokio::spawn(async move {
             // record errors for deduplication
             let mut last_errors: Option<anyhow::Error> = None;
+            // track latencies in the range [1 msec..1 hour]
+            let mut hist = Histogram::<u64>::new_with_bounds(1, 60 * 60 * 1000, 2).unwrap();
             while !stopped.load(Ordering::Relaxed) {
                 // contact all input uris
                 if let Ok(client) = QdrantClient::new(Some(get_config(&uri))).await {
@@ -35,16 +38,30 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
                             if let Some(_prev_error) = &last_errors {
                                 last_errors = Some(e)
                             } else {
+                                let min = hist.min();
+                                let p50 = hist.value_at_quantile(0.5);
+                                let p99 = hist.value_at_quantile(0.99);
+                                let max = hist.max();
                                 error!(
-                                    "healthcheck failed for {} after {:?} ({})",
+                                    "healthcheck failed for {} after {:?} [min: {}, p50: {}ms, p99: {}ms, max: {}ms] ({})",
                                     uri,
                                     execution_start.elapsed(),
+                                    min,
+                                    p50,
+                                    p99,
+                                    max,
                                     e
                                 );
                                 last_errors = Some(e)
                             }
                         }
                     }
+                    // record latency in ms
+                    hist.record_correct(
+                        execution_start.elapsed().as_millis() as u64,
+                        args.health_check_delay_ms as u64,
+                    )
+                    .unwrap();
                 }
                 // delay between checks
                 tokio::time::sleep(Duration::from_millis(args.health_check_delay_ms as u64)).await;
