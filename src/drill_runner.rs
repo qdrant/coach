@@ -49,10 +49,17 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     ];
 
     // filter drills by name
-    let drills_to_run = all_drills
-        .into_iter()
-        .filter(|d| !args.ignored_drills.contains(&d.name()))
-        .collect::<Vec<_>>();
+    let drills_to_run = if !args.drills_to_run.is_empty() {
+        all_drills
+            .into_iter()
+            .filter(|d| args.drills_to_run.contains(&d.name()))
+            .collect::<Vec<_>>()
+    } else {
+        all_drills
+            .into_iter()
+            .filter(|d| !args.ignored_drills.contains(&d.name()))
+            .collect::<Vec<_>>()
+    };
 
     let mut drill_tasks = vec![];
 

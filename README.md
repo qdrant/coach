@@ -37,6 +37,8 @@ Options:
           Delay between health checks [default: 200]
       --ignored-drills <IGNORED_DRILLS>
           Name of the drills to ignore
+      --drills-to-run <DRILLS_TO_RUN>
+          Name of the drills to run, ignore others
   -h, --help
           Print help information
   -V, --version

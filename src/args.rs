@@ -31,4 +31,7 @@ pub struct Args {
     /// Name of the drills to ignore
     #[arg(long)]
     pub ignored_drills: Vec<String>,
+    /// Name of the drills to run, ignore others
+    #[arg(long)]
+    pub drills_to_run: Vec<String>,
 }
