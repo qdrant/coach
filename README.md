@@ -32,13 +32,15 @@ Options:
       --stop-at-first-error
           Stop all drills at the first error encountered
       --only-healthcheck
-          Only run the healtcheck for the input URI, no drills executed
+          Only run the healthcheck for the input URI, no drills executed
       --health-check-delay-ms <HEALTH_CHECK_DELAY_MS>
           Delay between health checks [default: 200]
       --ignored-drills <IGNORED_DRILLS>
           Name of the drills to ignore
       --drills-to-run <DRILLS_TO_RUN>
           Name of the drills to run, ignore others
+      --grpc-timeout-ms <GRPC_TIMEOUT_MS>
+          Timeout of gRPC client [default: 1000]
   -h, --help
           Print help information
   -V, --version

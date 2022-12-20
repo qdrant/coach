@@ -22,7 +22,7 @@ pub struct Args {
     /// Stop all drills at the first error encountered
     #[arg(long, default_value_t = false)]
     pub stop_at_first_error: bool,
-    /// Only run the healtcheck for the input URI, no drills executed.
+    /// Only run the healthcheck for the input URI, no drills executed.
     #[arg(long, default_value_t = false)]
     pub only_healthcheck: bool,
     /// Delay between health checks
@@ -34,4 +34,7 @@ pub struct Args {
     /// Name of the drills to run, ignore others
     #[arg(long)]
     pub drills_to_run: Vec<String>,
+    /// Timeout of gRPC client
+    #[arg(long, default_value_t = 1000)]
+    pub grpc_timeout_ms: usize,
 }

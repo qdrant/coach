@@ -12,6 +12,7 @@ use env_logger::Target;
 use qdrant_client::client::QdrantClientConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -51,8 +52,11 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_config(url: &str) -> QdrantClientConfig {
+fn get_config(url: &str, timeout_ms: usize) -> QdrantClientConfig {
     let mut config = QdrantClientConfig::from_url(url);
+    config.timeout = Duration::from_millis(timeout_ms as u64);
+    config.connect_timeout = Duration::from_millis(timeout_ms as u64);
+
     let api_key = std::env::var("QDRANT_API_KEY").ok();
 
     if let Some(api_key) = api_key {

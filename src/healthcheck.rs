@@ -24,7 +24,9 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             let mut hist = Histogram::<u64>::new_with_bounds(1, 60 * 60 * 1000, 2).unwrap();
             while !stopped.load(Ordering::Relaxed) {
                 // contact all input uris
-                if let Ok(client) = QdrantClient::new(Some(get_config(&uri))).await {
+                if let Ok(client) =
+                    QdrantClient::new(Some(get_config(&uri, args.grpc_timeout_ms))).await
+                {
                     let execution_start = Instant::now();
                     match client.health_check().await {
                         Ok(_) => {
