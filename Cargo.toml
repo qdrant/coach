@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.68"
 thiserror = "1.0.38"
-clap = { version = "4.0.29", features = ["derive"] }
+clap = { version = "4.0.30", features = ["derive"] }
 ctrlc = "3.2.4"
 futures = "0.3.25"
 async-trait = "0.1.60"

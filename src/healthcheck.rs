@@ -25,7 +25,8 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             while !stopped.load(Ordering::Relaxed) {
                 // contact all input uris
                 if let Ok(client) =
-                    QdrantClient::new(Some(get_config(&uri, args.grpc_timeout_ms))).await
+                    QdrantClient::new(Some(get_config(&uri, args.grpc_health_check_timeout_ms)))
+                        .await
                 {
                     let execution_start = Instant::now();
                     match client.health_check().await {

@@ -37,4 +37,7 @@ pub struct Args {
     /// Timeout of gRPC client
     #[arg(long, default_value_t = 1000)]
     pub grpc_timeout_ms: usize,
+    /// Timeout of gRPC health client
+    #[arg(long, default_value_t = 10)]
+    pub grpc_health_check_timeout_ms: usize,
 }
