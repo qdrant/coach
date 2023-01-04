@@ -14,7 +14,7 @@ WORKDIR /coach
 
 COPY --from=planner /coach/recipe.json recipe.json
 
-RUN apt-get update && apt-get install -y clang cmake && rustup component add rustfmt
+RUN apt-get update && apt-get install -y clang cmake protobuf-compiler && rustup component add rustfmt
 
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json
