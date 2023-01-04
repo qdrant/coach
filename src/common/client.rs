@@ -2,6 +2,7 @@ use crate::args::Args;
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Cancelled;
 use crate::common::generators::{random_payload, random_vector};
+use anyhow::Context;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
@@ -21,7 +22,11 @@ pub async fn get_points_count(
 ) -> Result<usize, anyhow::Error> {
     let point_count = client
         .collection_info(collection_name)
-        .await?
+        .await
+        .context(format!(
+            "Failed to fetch points count for {}",
+            collection_name
+        ))?
         .result
         .unwrap()
         .points_count;
@@ -50,7 +55,11 @@ pub async fn delete_points(
                 })),
             },
         )
-        .await?;
+        .await
+        .context(format!(
+            "Failed to delete {} points for {}",
+            points_count, collection_name
+        ))?;
     Ok(())
 }
 
@@ -66,7 +75,13 @@ pub async fn wait_index(
             return Err(Cancelled);
         }
         sleep(Duration::from_secs(1)).await;
-        let info = client.collection_info(&collection_name).await?;
+        let info = client
+            .collection_info(&collection_name)
+            .await
+            .context(format!(
+                "Failed to fetch collection info for {}",
+                collection_name
+            ))?;
         if info.result.unwrap().status == CollectionStatus::Green as i32 {
             seen += 1;
             if seen == 3 {
@@ -84,7 +99,7 @@ pub async fn create_collection(
     collection_name: &str,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
-    match client
+    client
         .create_collection(&CreateCollection {
             collection_name: collection_name.to_string(),
             vectors_config: Some(VectorsConfig {
@@ -101,10 +116,8 @@ pub async fn create_collection(
             ..Default::default()
         })
         .await
-    {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!("Failed to create collection: {}", e)),
-    }
+        .context(format!("Failed to create collection {}", collection_name))?;
+    Ok(())
 }
 
 /// delete collection without checking if it exists
@@ -112,10 +125,11 @@ pub async fn delete_collection(
     client: &QdrantClient,
     collection_name: &str,
 ) -> Result<(), anyhow::Error> {
-    match client.delete_collection(&collection_name).await {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!("Failed to delete collection: {}", e)),
-    }
+    client
+        .delete_collection(&collection_name)
+        .await
+        .context(format!("Failed to delete collection {}", collection_name))?;
+    Ok(())
 }
 
 /// delete collection if exists & create new one
@@ -166,7 +180,11 @@ pub async fn insert_points(
         // push batch blocking
         client
             .upsert_points_blocking(collection_name, points)
-            .await?;
+            .await
+            .context(format!(
+                "Failed to insert {} points in {}",
+                points_count, collection_name
+            ))?;
     }
     Ok(())
 }

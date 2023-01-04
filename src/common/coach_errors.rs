@@ -5,7 +5,8 @@ use thiserror::Error;
 pub enum CoachError {
     #[error("Drill cancelled")]
     Cancelled,
-    #[error("Client error - {0}")]
+    #[error("Client error - {0:#}")]
+    // https://docs.rs/anyhow/latest/anyhow/struct.Error.html#display-representations
     Client(Error),
     #[error("Invariant error - {0}")]
     Invariant(String),
