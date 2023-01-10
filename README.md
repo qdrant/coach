@@ -71,3 +71,11 @@ docker pull qdrant/coach:latest
 # Run the tool
 docker run qdrant/coach ./coach
 ```
+
+## API key
+
+```bash
+export QDRANT_API_KEY='X3CXTPlA....lLZi8y5gA'
+```
+
+or `-e QDRANT_API_KEY='X3CXTPlA....lLZi8y5gA'` with Docker.
