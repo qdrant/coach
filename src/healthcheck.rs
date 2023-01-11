@@ -1,4 +1,5 @@
 use crate::args::Args;
+use crate::common::histograms::render_histogram;
 use crate::get_config;
 use anyhow::Result;
 use hdrhistogram::Histogram;
@@ -20,7 +21,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             // use `grpc_health_check_timeout_ms` as client timeout
             let client_config = get_config(&uri, args.grpc_health_check_timeout_ms);
             let client = QdrantClient::new(Some(client_config)).await;
-            // Can fail only if the configuration is invalid
+            // fails only if the configuration is invalid
             if let Err(e) = client {
                 error!("Failed to create healthcheck client for {}: {}", uri, e);
                 return;
@@ -33,49 +34,41 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             let mut hist = Histogram::<u64>::new_with_bounds(1, 60 * 60 * 1000, 2).unwrap();
             while !stopped.load(Ordering::Relaxed) {
                 let execution_start = Instant::now();
-                match client.health_check().await {
+                let health_check_result = client.health_check().await;
+                let elapsed = execution_start.elapsed();
+                // record latency in ms
+                hist.record(elapsed.as_millis() as u64)
+                    .expect("Failed to record latency");
+                match health_check_result {
                     Ok(_) => {
                         // marking it as healthy
                         if let Some(_prev) = last_errors.take() {
                             info!(
-                                "{} is healthy again after {} failures ({:?})",
+                                "{} is healthy again after {} consecutive failures {}",
                                 uri,
                                 failures,
-                                execution_start.elapsed()
+                                render_histogram(&hist)
                             );
                             failures = 0;
                         }
                     }
                     Err(e) => {
-                        // do not spam logs with the same error
+                        // do not spam logs with errors if it has already failed
                         if let Some(_prev_error) = &last_errors {
                             last_errors = Some(e)
                         } else {
-                            let min = hist.min();
-                            let p50 = hist.value_at_quantile(0.5);
-                            let p99 = hist.value_at_quantile(0.99);
-                            let max = hist.max();
                             error!(
-                                    "healthcheck failed for {} after {:?} [min: {}, p50: {}ms, p99: {}ms, max: {}ms] ({})",
-                                    uri,
-                                    execution_start.elapsed(),
-                                    min,
-                                    p50,
-                                    p99,
-                                    max,
-                                    e
-                                );
+                                "healthcheck failed for {} after {:?} {} ({})",
+                                uri,
+                                elapsed,
+                                render_histogram(&hist),
+                                e
+                            );
                             last_errors = Some(e)
                         }
                         failures += 1;
                     }
                 }
-                // record latency in ms
-                hist.record_correct(
-                    execution_start.elapsed().as_millis() as u64,
-                    args.health_check_delay_ms as u64,
-                )
-                .unwrap();
             }
             // delay between checks
             tokio::time::sleep(Duration::from_millis(args.health_check_delay_ms as u64)).await;
