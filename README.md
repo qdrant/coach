@@ -42,7 +42,7 @@ Options:
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
           Timeout of gRPC client [default: 1000]
       --grpc-health-check-timeout-ms <GRPC_HEALTH_CHECK_TIMEOUT_MS>
-          Timeout of gRPC health client [default: 10]
+          Timeout of gRPC health client [default: 20]
   -h, --help
           Print help information
   -V, --version
