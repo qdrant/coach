@@ -10,6 +10,7 @@ Those drills are run continuously to detect unexpected behaviors over a long per
 - `points_churn`: drill that creates and deletes points in a collection.
 - `points_search`: drill that performs search requests on a collection.
 - `points_upsert`: drill that consistently updates the same points.
+- `collection_snapshot_churn`: drill that keeps on creating and deleting the same collection snapshot.
 
 ## usage
 
