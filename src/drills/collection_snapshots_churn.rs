@@ -5,8 +5,7 @@ use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, get_points_count, insert_points, recreate_collection,
-    wait_index,
+    create_collection, get_points_count, insert_points, recreate_collection, wait_index,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Invariant;
@@ -64,7 +63,7 @@ impl Drill for CollectionSnapshotsChurn {
                 self.payload_count,
                 self.stopped.clone(),
             )
-                .await?;
+            .await?;
 
             // waiting for green status
             wait_index(client, &self.collection_name, self.stopped.clone()).await?;
@@ -80,31 +79,47 @@ impl Drill for CollectionSnapshotsChurn {
         }
 
         // number of snapshots before
-        let snapshot_count = client.list_snapshots(&self.collection_name).await?.snapshot_descriptions.len();
+        let snapshot_count = client
+            .list_snapshots(&self.collection_name)
+            .await?
+            .snapshot_descriptions
+            .len();
 
         // create snapshot
-        let snapshot = client
-            .create_snapshot(&self.collection_name)
-            .await?;
+        let snapshot = client.create_snapshot(&self.collection_name).await?;
 
         // number of snapshots before
-        let post_create_snapshot_count = client.list_snapshots(&self.collection_name).await?.snapshot_descriptions.len();
+        let post_create_snapshot_count = client
+            .list_snapshots(&self.collection_name)
+            .await?
+            .snapshot_descriptions
+            .len();
         if post_create_snapshot_count != snapshot_count + 1 {
             return Err(Invariant(format!(
-                "Collection snapshot count is wrong {} vs {}", post_create_snapshot_count, snapshot_count + 1
+                "Collection snapshot count is wrong {} vs {}",
+                post_create_snapshot_count,
+                snapshot_count + 1
             )));
         }
 
         // delete snapshot
         client
-            .delete_snapshot(&self.collection_name, &snapshot.snapshot_description.unwrap().name)
+            .delete_snapshot(
+                &self.collection_name,
+                &snapshot.snapshot_description.unwrap().name,
+            )
             .await?;
 
         // number of snapshots before
-        let post_delete_snapshot_count = client.list_snapshots(&self.collection_name).await?.snapshot_descriptions.len();
+        let post_delete_snapshot_count = client
+            .list_snapshots(&self.collection_name)
+            .await?
+            .snapshot_descriptions
+            .len();
         if post_delete_snapshot_count != snapshot_count {
             return Err(Invariant(format!(
-                "Collection snapshot count is wrong {} vs {}", post_delete_snapshot_count, snapshot_count
+                "Collection snapshot count is wrong {} vs {}",
+                post_delete_snapshot_count, snapshot_count
             )));
         }
 

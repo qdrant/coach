@@ -1,6 +1,7 @@
 use crate::args::Args;
 use crate::common::coach_errors::CoachError;
 use crate::drills::collection_churn::CollectionChurn;
+use crate::drills::collection_snapshots_churn::CollectionSnapshotsChurn;
 use crate::drills::points_churn::PointsChurn;
 use crate::drills::points_search::PointsSearch;
 use crate::drills::points_upsert::PointsUpdate;
@@ -19,7 +20,6 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
-use crate::drills::collection_snapshots_churn::CollectionSnapshotsChurn;
 
 /// A drill is a single test that is run periodically
 #[async_trait]
