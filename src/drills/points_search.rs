@@ -58,6 +58,7 @@ impl PointsSearch {
                 offset: None,
                 vector_name: None,
                 with_vectors: None,
+                read_consistency: None,
             })
             .await?;
 

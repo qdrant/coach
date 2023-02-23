@@ -54,6 +54,7 @@ pub async fn delete_points(
                     ids: points_selector,
                 })),
             },
+            None,
         )
         .await
         .context(format!(
@@ -179,7 +180,7 @@ pub async fn insert_points(
 
         // push batch blocking
         client
-            .upsert_points_blocking(collection_name, points)
+            .upsert_points_blocking(collection_name, points, None)
             .await
             .context(format!(
                 "Failed to insert {} points in {}",
