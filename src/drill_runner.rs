@@ -20,6 +20,7 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
+use crate::drills::toggle_indexing::ToggleIndexing;
 
 /// A drill is a single test that is run periodically
 #[async_trait]
@@ -48,6 +49,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
         Box::new(PointsChurn::new(stopped.clone())),
         Box::new(PointsUpdate::new(stopped.clone())),
         Box::new(CollectionSnapshotsChurn::new(stopped.clone())),
+        Box::new(ToggleIndexing::new(stopped.clone())),
     ];
 
     // filter drills by name

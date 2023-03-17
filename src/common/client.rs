@@ -64,6 +64,60 @@ pub async fn delete_points(
     Ok(())
 }
 
+pub async fn disable_indexing(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<(), anyhow::Error> {
+    set_indexing_threshold(client, collection_name, 1000000).await?;
+    Ok(())
+}
+
+pub async fn enable_indexing(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<(), anyhow::Error> {
+    set_indexing_threshold(client, collection_name, 1).await?;
+    Ok(())
+}
+
+pub async fn set_indexing_threshold(
+    client: &QdrantClient,
+    collection_name: &str,
+    threshold: usize,
+) -> Result<(), anyhow::Error> {
+    client
+        .update_collection(
+            collection_name,
+            &OptimizersConfigDiff {
+                indexing_threshold: Some(threshold as u64),
+                ..Default::default()
+            },
+        )
+        .await
+        .context(format!(
+            "Failed to set indexing threshold for {}",
+            collection_name
+        ))?;
+    Ok(())
+}
+
+pub async fn get_collection_status(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<CollectionStatus, anyhow::Error> {
+    let status = client
+        .collection_info(collection_name)
+        .await
+        .context(format!(
+            "Failed to fetch collection info for {}",
+            collection_name
+        ))?
+        .result
+        .unwrap()
+        .status;
+    Ok(CollectionStatus::from_i32(status).unwrap())
+}
+
 pub async fn wait_index(
     client: &QdrantClient,
     collection_name: &str,
@@ -76,14 +130,8 @@ pub async fn wait_index(
             return Err(Cancelled);
         }
         sleep(Duration::from_secs(1)).await;
-        let info = client
-            .collection_info(&collection_name)
-            .await
-            .context(format!(
-                "Failed to fetch collection info for {}",
-                collection_name
-            ))?;
-        if info.result.unwrap().status == CollectionStatus::Green as i32 {
+        let collection_status = get_collection_status(client, collection_name).await?;
+        if collection_status == CollectionStatus::Green {
             seen += 1;
             if seen == 3 {
                 break;
