@@ -5,7 +5,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::args::Args;
-use crate::common::client::{create_collection, delete_collection, disable_indexing, enable_indexing, get_collection_status, get_points_count, insert_points, wait_index};
+use crate::common::client::{
+    create_collection, delete_collection, disable_indexing, enable_indexing, get_collection_status,
+    get_points_count, insert_points, wait_index,
+};
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
 use crate::common::generators::{random_filter, random_vector};
@@ -95,7 +98,8 @@ impl Drill for ToggleIndexing {
             self.vec_dim,
             self.payload_count,
             self.stopped.clone(),
-        ).await?;
+        )
+        .await?;
 
         let collection_status = get_collection_status(client, &self.collection_name).await?;
 
