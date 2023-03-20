@@ -69,9 +69,9 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
                         failures += 1;
                     }
                 }
+                // delay between checks
+                tokio::time::sleep(Duration::from_millis(args.health_check_delay_ms as u64)).await;
             }
-            // delay between checks
-            tokio::time::sleep(Duration::from_millis(args.health_check_delay_ms as u64)).await;
         });
         healthcheck_tasks.push(handle);
     }
