@@ -160,6 +160,7 @@ pub async fn create_collection(
             replication_factor: Some(args.replication_factor as u32),
             optimizers_config: Some(OptimizersConfigDiff {
                 indexing_threshold: args.indexing_threshold.map(|i| i as u64),
+                memmap_threshold: args.memmap_threshold.map(|i| i as u64),
                 ..Default::default()
             }),
             ..Default::default()
@@ -208,9 +209,10 @@ pub async fn insert_points(
     let num_batches = points_count / batch_size;
 
     for batch_id in 0..num_batches {
-        let mut points = Vec::new();
+        let mut points = Vec::with_capacity(batch_size);
+        let batch_base_id = batch_id as u64 * batch_size as u64;
         for i in 0..batch_size {
-            let idx = batch_id as u64 * batch_size as u64 + i as u64;
+            let idx = batch_base_id + i as u64;
 
             let point_id: PointId = PointId {
                 point_id_options: Some(PointIdOptions::Num(idx)),

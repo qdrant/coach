@@ -16,6 +16,9 @@ pub struct Args {
     /// Optimizer indexing threshold
     #[arg(long)]
     pub indexing_threshold: Option<usize>,
+    /// Maximum size (in KiloBytes) of vectors to store in-memory per segment.
+    #[arg(long)]
+    pub memmap_threshold: Option<usize>,
     /// Always create collection before the first run of a drill
     #[arg(long, default_value_t = false)]
     pub recreate_collection: bool,

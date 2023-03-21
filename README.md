@@ -29,6 +29,8 @@ Options:
           Replication factor for collections [default: 1]
       --indexing-threshold <INDEXING_THRESHOLD>
           Optimizer indexing threshold
+      --memmap-threshold <MEMMAP_THRESHOLD>
+          Maximum size (in KiloBytes) of vectors to store in-memory per segment
       --recreate-collection
           Always create collection before the first run of a drill
       --stop-at-first-error
@@ -46,10 +48,9 @@ Options:
       --grpc-health-check-timeout-ms <GRPC_HEALTH_CHECK_TIMEOUT_MS>
           Timeout of gRPC health client [default: 20]
   -h, --help
-          Print help information
+          Print help
   -V, --version
-          Print version information
-
+          Print version
 ```
 
 e.g for a distributed deployment
