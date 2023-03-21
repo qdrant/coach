@@ -11,9 +11,9 @@ use crate::common::client::{
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
+use crate::common::generators::{random_filter, random_vector};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
-use crate::common::generators::{random_filter, random_vector};
 
 /// Drill that performs index toggle on a collection.
 /// The collection is always re-created and populated with random data.
