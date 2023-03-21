@@ -26,7 +26,9 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
                 error!("Failed to create healthcheck client for {}: {}", uri, e);
                 return;
             }
+            // safe unwrap
             let client = client.unwrap();
+            let health_check_delay_ms = Duration::from_millis(args.health_check_delay_ms as u64);
             // record errors for deduplication
             let mut last_errors: Option<anyhow::Error> = None;
             let mut failures = 0;
@@ -70,7 +72,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
                     }
                 }
                 // delay between checks
-                tokio::time::sleep(Duration::from_millis(args.health_check_delay_ms as u64)).await;
+                tokio::time::sleep(health_check_delay_ms).await;
             }
         });
         healthcheck_tasks.push(handle);

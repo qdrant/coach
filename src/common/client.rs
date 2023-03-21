@@ -1,7 +1,7 @@
 use crate::args::Args;
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Cancelled;
-use crate::common::generators::{random_payload, random_vector};
+use crate::common::generators::{random_filter, random_payload, random_vector};
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -9,12 +9,41 @@ use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
     CollectionStatus, CreateCollection, Distance, OptimizersConfigDiff, PointId, PointStruct,
-    PointsIdsList, PointsSelector, VectorParams, VectorsConfig,
+    PointsIdsList, PointsSelector, SearchPoints, SearchResponse, VectorParams, VectorsConfig,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
+
+pub async fn search_points(
+    client: &QdrantClient,
+    collection_name: &str,
+    vec_dim: usize,
+    payload_count: usize,
+) -> Result<SearchResponse, anyhow::Error> {
+    let query_vector = random_vector(vec_dim);
+    let query_filter = random_filter(Some(payload_count));
+
+    let response = client
+        .search_points(&SearchPoints {
+            collection_name: collection_name.to_string(),
+            vector: query_vector,
+            filter: query_filter,
+            limit: 100,
+            with_payload: Some(true.into()),
+            params: None,
+            score_threshold: None,
+            offset: None,
+            vector_name: None,
+            with_vectors: None,
+            read_consistency: None,
+        })
+        .await
+        .context(format!("Failed to search points on {}", collection_name))?;
+
+    Ok(response)
+}
 
 pub async fn get_points_count(
     client: &QdrantClient,
@@ -95,8 +124,8 @@ pub async fn set_indexing_threshold(
         )
         .await
         .context(format!(
-            "Failed to set indexing threshold for {}",
-            collection_name
+            "Failed to set indexing threshold to {} for {}",
+            threshold, collection_name
         ))?;
     Ok(())
 }
@@ -233,8 +262,8 @@ pub async fn insert_points(
             .upsert_points_blocking(collection_name, points, None)
             .await
             .context(format!(
-                "Failed to insert {} points in {}",
-                points_count, collection_name
+                "Failed to insert {} points (batch {}/{}) into {}",
+                batch_size, batch_id, num_batches, collection_name
             ))?;
     }
     Ok(())

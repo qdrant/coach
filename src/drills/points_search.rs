@@ -1,16 +1,14 @@
 use anyhow::Result;
 use qdrant_client::client::QdrantClient;
-use qdrant_client::qdrant::{SearchPoints, SearchResponse};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, get_points_count, insert_points, recreate_collection, wait_index,
+    create_collection, get_points_count, insert_points, recreate_collection, search_points, wait_index,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
-use crate::common::generators::{random_filter, random_vector};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
 
@@ -40,29 +38,6 @@ impl PointsSearch {
             payload_count,
             stopped,
         }
-    }
-
-    pub async fn search(&self, client: &QdrantClient) -> Result<SearchResponse, anyhow::Error> {
-        let query_vector = random_vector(self.vec_dim);
-        let query_filter = random_filter(Some(self.payload_count));
-
-        let response = client
-            .search_points(&SearchPoints {
-                collection_name: self.collection_name.to_string(),
-                vector: query_vector,
-                filter: query_filter,
-                limit: 100,
-                with_payload: Some(true.into()),
-                params: None,
-                score_threshold: None,
-                offset: None,
-                vector_name: None,
-                with_vectors: None,
-                read_consistency: None,
-            })
-            .await?;
-
-        Ok(response)
     }
 }
 
@@ -111,7 +86,13 @@ impl Drill for PointsSearch {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
             }
-            let response = self.search(client).await?;
+            let response = search_points(
+                client,
+                &self.collection_name,
+                self.vec_dim,
+                self.payload_count,
+            )
+            .await?;
             // assert not empty
             if response.result.is_empty() {
                 return Err(Invariant("Search returned empty result".to_string()));
