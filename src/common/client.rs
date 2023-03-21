@@ -68,7 +68,7 @@ pub async fn disable_indexing(
     client: &QdrantClient,
     collection_name: &str,
 ) -> Result<(), anyhow::Error> {
-    set_indexing_threshold(client, collection_name, 1000000).await?;
+    set_indexing_threshold(client, collection_name, usize::MAX).await?;
     Ok(())
 }
 
