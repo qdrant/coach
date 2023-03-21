@@ -11,10 +11,9 @@ use crate::common::client::{
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
-use crate::common::generators::{random_filter, random_vector};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
-use tokio::time::sleep;
+use crate::common::generators::{random_filter, random_vector};
 
 /// Drill that performs index toggle on a collection.
 /// The collection is always re-created and populated with random data.
@@ -33,7 +32,7 @@ impl ToggleIndexing {
         let vec_dim = 128;
         let payload_count = 2;
         let search_count = 1000;
-        let points_count = 15000; // large enough to trigger HNSW indexing
+        let points_count = 20000; // large enough to trigger HNSW indexing
         ToggleIndexing {
             collection_name,
             search_count,
@@ -101,42 +100,6 @@ impl Drill for ToggleIndexing {
         )
         .await?;
 
-        let collection_status = get_collection_status(client, &self.collection_name).await?;
-
-        if collection_status != CollectionStatus::Green {
-            return Err(Invariant(format!(
-                "Collection status is not Green after insert but {:?}",
-                collection_status
-            )));
-        }
-
-        // toggle indexing
-        enable_indexing(client, &self.collection_name).await?;
-
-        // waiting for yellow status
-        sleep(std::time::Duration::from_secs(1)).await;
-
-        let collection_status = get_collection_status(client, &self.collection_name).await?;
-
-        if collection_status != CollectionStatus::Yellow {
-            return Err(Invariant(format!(
-                "Collection status is not Yellow after index toggle but {:?}",
-                collection_status
-            )));
-        }
-
-        // waiting for green status
-        wait_index(client, &self.collection_name, self.stopped.clone()).await?;
-
-        let collection_status = get_collection_status(client, &self.collection_name).await?;
-
-        if collection_status != CollectionStatus::Green {
-            return Err(Invariant(format!(
-                "Collection status is not Green after indexing but {:?}",
-                collection_status
-            )));
-        }
-
         // assert point count
         let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != self.points_count {
@@ -145,6 +108,9 @@ impl Drill for ToggleIndexing {
                 points_count, self.points_count
             )));
         }
+
+        // toggle indexing to build index in background while searching
+        enable_indexing(client, &self.collection_name).await?;
 
         // search `search_count` times
         for _i in 0..self.search_count {
@@ -156,6 +122,17 @@ impl Drill for ToggleIndexing {
             if response.result.is_empty() {
                 return Err(Invariant("Search returned empty result".to_string()));
             }
+        }
+
+        // waiting for green status
+        wait_index(client, &self.collection_name, self.stopped.clone()).await?;
+
+        let collection_status = get_collection_status(client, &self.collection_name).await?;
+        if collection_status != CollectionStatus::Green {
+            return Err(Invariant(format!(
+                "Collection status is not Green after indexing but {:?}",
+                collection_status
+            )));
         }
 
         delete_collection(client, &self.collection_name).await?;
