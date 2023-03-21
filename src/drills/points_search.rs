@@ -5,7 +5,8 @@ use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, get_points_count, insert_points, recreate_collection, search_points, wait_index,
+    create_collection, get_points_count, insert_points, recreate_collection, search_points,
+    wait_index,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
