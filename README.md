@@ -44,9 +44,9 @@ Options:
       --drills-to-run <DRILLS_TO_RUN>
           Name of the drills to run, ignore others
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
-          Timeout of gRPC client [default: 1000]
+          Timeout of gRPC client [default: 5000]
       --grpc-health-check-timeout-ms <GRPC_HEALTH_CHECK_TIMEOUT_MS>
-          Timeout of gRPC health client [default: 20]
+          Timeout of gRPC health client [default: 50]
   -h, --help
           Print help
   -V, --version

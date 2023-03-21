@@ -38,9 +38,9 @@ pub struct Args {
     #[arg(long)]
     pub drills_to_run: Vec<String>,
     /// Timeout of gRPC client
-    #[arg(long, default_value_t = 1000)]
+    #[arg(long, default_value_t = 5000)]
     pub grpc_timeout_ms: usize,
     /// Timeout of gRPC health client
-    #[arg(long, default_value_t = 20)]
+    #[arg(long, default_value_t = 50)]
     pub grpc_health_check_timeout_ms: usize,
 }
