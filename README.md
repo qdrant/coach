@@ -12,6 +12,7 @@ Those drills are run continuously to detect unexpected behaviors over a long per
 - `points_upsert`: drill that consistently updates the same points.
 - `collection_snapshot_churn`: drill that keeps on creating and deleting the same collection snapshot.
 - `toggle_indexing`: drill that toggles indexing once it is populated.
+- `high_concurrency`: drill that performs high concurrency requests on a collection.
 
 ## usage
 
@@ -24,7 +25,7 @@ Options:
       --uris <URIS>
           Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6334]
   -p, --parallel-drills <PARALLEL_DRILLS>
-          Number of parallel drills to run [default: 3]
+          Number of parallel drills to run [default: 2]
       --replication-factor <REPLICATION_FACTOR>
           Replication factor for collections [default: 1]
       --indexing-threshold <INDEXING_THRESHOLD>

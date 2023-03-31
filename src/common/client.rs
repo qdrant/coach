@@ -9,12 +9,98 @@ use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
     CollectionStatus, CreateCollection, Distance, OptimizersConfigDiff, PointId, PointStruct,
-    PointsIdsList, PointsSelector, SearchPoints, SearchResponse, VectorParams, VectorsConfig,
+    PointsIdsList, PointsSelector, RetrievedPoint, SearchPoints, SearchResponse, VectorParams,
+    VectorsConfig, WithPayloadSelector, WithVectorsSelector, WriteOrdering,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
+
+pub async fn get_point_by_id(
+    client: &QdrantClient,
+    collection_name: &str,
+    point_id: u64,
+) -> Result<Option<RetrievedPoint>, anyhow::Error> {
+    let point_id_grpc = point_id.into();
+    // type inference issues forces to ascribe the types :shrug:
+    let with_vectors: Option<WithVectorsSelector> = None;
+    let with_payload: Option<WithPayloadSelector> = None;
+    let point = client
+        .get_points(
+            collection_name,
+            &vec![point_id_grpc],
+            with_vectors,
+            with_payload,
+            None,
+        )
+        .await
+        .context(format!(
+            "Failed to get point by id {} from {}",
+            point_id, collection_name
+        ))?;
+    Ok(point.result.first().cloned())
+}
+
+/// upsert single point into collection
+pub async fn upsert_point_by_id(
+    client: &QdrantClient,
+    collection_name: &str,
+    point_id: u64,
+    vec_dim: usize,
+    payload_count: usize,
+    write_ordering: Option<WriteOrdering>,
+) -> Result<(), CoachError> {
+    let point_id_grpc: PointId = PointId {
+        point_id_options: Some(PointIdOptions::Num(point_id)),
+    };
+
+    let point_struct = PointStruct::new(
+        point_id_grpc,
+        random_vector(vec_dim),
+        random_payload(Some(payload_count)),
+    );
+
+    let points = vec![point_struct];
+    client
+        .upsert_points_blocking(collection_name, points, write_ordering)
+        .await
+        .context(format!(
+            "Failed to update  {} in {}",
+            point_id, collection_name
+        ))?;
+
+    Ok(())
+}
+
+/// delete points (blocking)
+pub async fn delete_point_by_id(
+    client: &QdrantClient,
+    collection_name: &str,
+    point_id: u64,
+) -> Result<(), anyhow::Error> {
+    let points_selector = vec![PointId {
+        point_id_options: Some(PointIdOptions::Num(point_id)),
+    }];
+
+    // delete point
+    client
+        .delete_points_blocking(
+            collection_name,
+            &PointsSelector {
+                points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
+                    ids: points_selector,
+                })),
+            },
+            None,
+        )
+        .await
+        .context(format!(
+            "Failed to delete point_id {} for {}",
+            point_id, collection_name
+        ))?;
+    Ok(())
+}
 
 pub async fn search_points(
     client: &QdrantClient,
@@ -226,12 +312,13 @@ pub async fn recreate_collection(
 }
 
 /// insert points into collection (blocking)
-pub async fn insert_points(
+pub async fn insert_points_batch(
     client: &QdrantClient,
     collection_name: &str,
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
+    write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
 ) -> Result<(), CoachError> {
     let batch_size = 100;
@@ -259,7 +346,7 @@ pub async fn insert_points(
 
         // push batch blocking
         client
-            .upsert_points_blocking(collection_name, points, None)
+            .upsert_points_blocking(collection_name, points, write_ordering.clone())
             .await
             .context(format!(
                 "Failed to insert {} points (batch {}/{}) into {}",

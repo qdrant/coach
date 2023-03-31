@@ -2,6 +2,7 @@ use crate::args::Args;
 use crate::common::coach_errors::CoachError;
 use crate::drills::collection_churn::CollectionChurn;
 use crate::drills::collection_snapshots_churn::CollectionSnapshotsChurn;
+use crate::drills::high_concurrency::HighConcurrency;
 use crate::drills::points_churn::PointsChurn;
 use crate::drills::points_search::PointsSearch;
 use crate::drills::points_upsert::PointsUpdate;
@@ -50,6 +51,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
         Box::new(PointsUpdate::new(stopped.clone())),
         Box::new(CollectionSnapshotsChurn::new(stopped.clone())),
         Box::new(ToggleIndexing::new(stopped.clone())),
+        Box::new(HighConcurrency::new(stopped.clone())),
     ];
 
     // filter drills by name
@@ -68,15 +70,16 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     let mut drill_tasks = vec![];
 
     info!(
-        "Coach is scheduling {} drills against {:?}:",
+        "Coach is scheduling {} drills against {:?} (by batch of {}):",
         drills_to_run.len(),
-        args.uris
+        args.uris,
+        args.parallel_drills,
     );
     for drill in &drills_to_run {
         info!(
             "- {} (repeating after {} seconds)",
             drill.name(),
-            drill.reschedule_after_sec()
+            drill.reschedule_after_sec(),
         );
     }
     // control the max number of concurrent drills running
@@ -211,7 +214,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                     if stopped.load(Ordering::Relaxed) {
                         break;
                     }
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
             }
         });

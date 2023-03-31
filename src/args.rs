@@ -8,7 +8,7 @@ pub struct Args {
     #[arg(long, default_value = "http://localhost:6334")]
     pub uris: Vec<String>,
     /// Number of parallel drills to run
-    #[arg(short, long, default_value_t = 3)]
+    #[arg(short, long, default_value_t = 2)]
     pub parallel_drills: usize,
     /// Replication factor for collections
     #[arg(long, default_value_t = 1)]

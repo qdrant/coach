@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, get_points_count, insert_points, recreate_collection, search_points,
+    create_collection, get_points_count, insert_points_batch, recreate_collection, search_points,
     wait_index,
 };
 use crate::common::coach_errors::CoachError;
@@ -59,12 +59,13 @@ impl Drill for PointsSearch {
             create_collection(client, &self.collection_name, args.clone()).await?;
 
             // insert some points
-            insert_points(
+            insert_points_batch(
                 client,
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
                 self.payload_count,
+                None,
                 self.stopped.clone(),
             )
             .await?;
@@ -108,12 +109,13 @@ impl Drill for PointsSearch {
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, args.clone()).await?;
             // insert some points
-            insert_points(
+            insert_points_batch(
                 client,
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
                 self.payload_count,
+                None,
                 self.stopped.clone(),
             )
             .await?;
