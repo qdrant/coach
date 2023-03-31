@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_point_by_id, disable_indexing, get_point_by_id, recreate_collection,
-    search_points, upsert_point_by_id,
+    create_collection, delete_collection, delete_point_by_id, disable_indexing, get_point_by_id,
+    recreate_collection, search_points, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
 use crate::drill_runner::Drill;
@@ -79,7 +79,13 @@ impl HighConcurrency {
         .await?;
 
         // getting point by id
-        get_point_by_id(client, &self.collection_name, point_id).await?;
+        let retrieved = get_point_by_id(client, &self.collection_name, point_id).await?;
+        if retrieved.is_none() {
+            return Err(CoachError::Invariant(format!(
+                "The point {} was not found after it was inserted in {}",
+                point_id, self.collection_name
+            )));
+        }
 
         // delete point by id
         delete_point_by_id(client, &self.collection_name, point_id).await?;
@@ -119,6 +125,9 @@ impl Drill for HighConcurrency {
             // stop on first error
             result?;
         }
+
+        // delete collection to not accumulate data over time
+        delete_collection(client, &self.collection_name).await?;
 
         Ok(())
     }
