@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_collection, delete_point_by_id, get_point_by_id, search_points,
-    set_payload, upsert_point_by_id,
+    create_collection, create_collection_snapshot, delete_collection, delete_collection_snapshot,
+    delete_point_by_id, get_point_by_id, search_points, set_payload, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
 use crate::drill_runner::Drill;
@@ -48,6 +48,16 @@ impl HighConcurrency {
     }
 
     async fn run_for_point(&self, client: &QdrantClient, point_id: u64) -> Result<(), CoachError> {
+        // snapshot modulo higher than concurrency_level
+        if point_id % 2000 == 0 {
+            println!("Creating snapshot because {}", point_id);
+            let snapshot = create_collection_snapshot(
+                client,
+                &self.collection_name,
+            ).await?;
+            delete_collection_snapshot(client, &self.collection_name, &snapshot.snapshot_description.unwrap().name).await?;
+        }
+
         // insert single point
         upsert_point_by_id(
             client,
