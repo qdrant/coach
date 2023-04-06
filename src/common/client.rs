@@ -122,7 +122,7 @@ pub async fn set_payload(
     };
 
     client
-        .set_payload(collection_name, points_selector, payload, write_ordering)
+        .set_payload_blocking(collection_name, points_selector, payload, write_ordering)
         .await
         .context(format!(
             "Failed to set payload for {} with payload_count {}",
