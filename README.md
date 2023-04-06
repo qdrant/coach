@@ -28,6 +28,8 @@ Options:
           Number of parallel drills to run [default: 2]
       --replication-factor <REPLICATION_FACTOR>
           Replication factor for collections [default: 1]
+      --write-consistency-factor <WRITE_CONSISTENCY_FACTOR>
+          Writing consistency factor for collections [default: 1]
       --indexing-threshold <INDEXING_THRESHOLD>
           Optimizer indexing threshold
       --memmap-threshold <MEMMAP_THRESHOLD>

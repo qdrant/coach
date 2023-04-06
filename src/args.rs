@@ -13,6 +13,9 @@ pub struct Args {
     /// Replication factor for collections
     #[arg(long, default_value_t = 1)]
     pub replication_factor: usize,
+    /// Writing consistency factor for collections
+    #[arg(long, default_value_t = 1)]
+    pub write_consistency_factor: usize,
     /// Optimizer indexing threshold
     #[arg(long)]
     pub indexing_threshold: Option<usize>,
