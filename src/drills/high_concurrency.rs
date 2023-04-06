@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::args::Args;
 use crate::common::client::{
     create_collection, delete_collection, delete_point_by_id, disable_indexing, get_point_by_id,
-    recreate_collection, search_points, upsert_point_by_id,
+    recreate_collection, search_points, set_payload, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
 use crate::drill_runner::Drill;
@@ -15,7 +15,7 @@ use futures::StreamExt;
 use qdrant_client::qdrant::WriteOrdering;
 
 /// Drill that performs operations on a collection with a high level of concurrency (without indexing).
-/// Run `concurrency_level` workers which repeatedly call APIs for inserting - > searching -> updating -> getting one -> deleting
+/// Run `concurrency_level` workers which repeatedly call APIs for inserting -> searching -> set payload -> updating -> getting one -> deleting
 /// The collection is created and populated with random data if it does not exist.
 pub struct HighConcurrency {
     collection_name: String,
@@ -64,6 +64,16 @@ impl HighConcurrency {
             &self.collection_name,
             self.vec_dim,
             self.payload_count,
+        )
+        .await?;
+
+        // set random payload on point
+        set_payload(
+            client,
+            &self.collection_name,
+            point_id,
+            self.payload_count,
+            self.write_concurrency.clone(),
         )
         .await?;
 

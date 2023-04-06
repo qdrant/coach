@@ -102,6 +102,35 @@ pub async fn delete_point_by_id(
     Ok(())
 }
 
+pub async fn set_payload(
+    client: &QdrantClient,
+    collection_name: &str,
+    point_id: u64,
+    payload_count: usize,
+    write_ordering: Option<WriteOrdering>,
+) -> Result<(), anyhow::Error> {
+    let payload = random_payload(Some(payload_count));
+
+    let points_id_selector = vec![PointId {
+        point_id_options: Some(PointIdOptions::Num(point_id)),
+    }];
+
+    let points_selector = &PointsSelector {
+        points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
+            ids: points_id_selector,
+        })),
+    };
+
+    client
+        .set_payload(collection_name, points_selector, payload, write_ordering)
+        .await
+        .context(format!(
+            "Failed to set payload for {} with payload_count {}",
+            collection_name, payload_count
+        ))?;
+    Ok(())
+}
+
 pub async fn search_points(
     client: &QdrantClient,
     collection_name: &str,
