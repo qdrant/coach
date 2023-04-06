@@ -1,11 +1,13 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use qdrant_client::client::QdrantClient;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, disable_indexing, get_points_count, insert_points_batch, recreate_collection,
+    count_collection_snapshots, create_collection, create_collection_snapshot,
+    delete_collection_snapshot, disable_indexing, get_points_count, insert_points_batch,
+    recreate_collection,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Invariant;
@@ -80,31 +82,14 @@ impl Drill for CollectionSnapshotsChurn {
         }
 
         // number of snapshots before
-        let snapshot_count = client
-            .list_snapshots(&self.collection_name)
-            .await?
-            .snapshot_descriptions
-            .len();
+        let snapshot_count = count_collection_snapshots(client, &self.collection_name).await?;
 
         // create snapshot
-        let snapshot = client
-            .create_snapshot(&self.collection_name)
-            .await
-            .context(format!(
-                "Failed to create collection snapshot for collection {}",
-                &self.collection_name
-            ))?;
+        let snapshot = create_collection_snapshot(client, &self.collection_name).await?;
 
         // number of snapshots before
-        let post_create_snapshot_count = client
-            .list_snapshots(&self.collection_name)
-            .await
-            .context(format!(
-                "Failed to list collection snapshots for collection {}",
-                &self.collection_name
-            ))?
-            .snapshot_descriptions
-            .len();
+        let post_create_snapshot_count =
+            count_collection_snapshots(client, &self.collection_name).await?;
 
         // assert snapshot count before
         if post_create_snapshot_count != snapshot_count + 1 {
@@ -117,24 +102,11 @@ impl Drill for CollectionSnapshotsChurn {
 
         // delete snapshot
         let snapshot_name = snapshot.snapshot_description.unwrap().name;
-        client
-            .delete_snapshot(&self.collection_name, &snapshot_name)
-            .await
-            .context(format!(
-                "Failed to delete collection snapshot {}",
-                snapshot_name
-            ))?;
+        delete_collection_snapshot(client, &self.collection_name, &snapshot_name).await?;
 
         // number of snapshots before
-        let post_delete_snapshot_count = client
-            .list_snapshots(&self.collection_name)
-            .await
-            .context(format!(
-                "Failed to list collection snapshots for collection {}",
-                &self.collection_name
-            ))?
-            .snapshot_descriptions
-            .len();
+        let post_delete_snapshot_count =
+            count_collection_snapshots(client, &self.collection_name).await?;
 
         // assert snapshot count after
         if post_delete_snapshot_count != snapshot_count {

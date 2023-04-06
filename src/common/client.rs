@@ -8,15 +8,17 @@ use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CollectionStatus, CreateCollection, Distance, OptimizersConfigDiff, PointId, PointStruct,
-    PointsIdsList, PointsSelector, RetrievedPoint, SearchPoints, SearchResponse, VectorParams,
-    VectorsConfig, WithPayloadSelector, WithVectorsSelector, WriteOrdering,
+    CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance, OptimizersConfigDiff,
+    PointId, PointStruct, PointsIdsList, PointsSelector, RetrievedPoint, SearchPoints,
+    SearchResponse, VectorParams, VectorsConfig, WithPayloadSelector, WithVectorsSelector,
+    WriteOrdering,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
+/// Get point by id
 pub async fn get_point_by_id(
     client: &QdrantClient,
     collection_name: &str,
@@ -42,7 +44,7 @@ pub async fn get_point_by_id(
     Ok(point.result.first().cloned())
 }
 
-/// upsert single point into collection
+/// upsert single point into collection (blocking)
 pub async fn upsert_point_by_id(
     client: &QdrantClient,
     collection_name: &str,
@@ -102,6 +104,7 @@ pub async fn delete_point_by_id(
     Ok(())
 }
 
+/// Set payload (blocking)
 pub async fn set_payload(
     client: &QdrantClient,
     collection_name: &str,
@@ -131,6 +134,7 @@ pub async fn set_payload(
     Ok(())
 }
 
+/// Search points
 pub async fn search_points(
     client: &QdrantClient,
     collection_name: &str,
@@ -160,6 +164,7 @@ pub async fn search_points(
     Ok(response)
 }
 
+/// Get points count
 pub async fn get_points_count(
     client: &QdrantClient,
     collection_name: &str,
@@ -208,6 +213,7 @@ pub async fn delete_points(
     Ok(())
 }
 
+///Disable indexing
 pub async fn disable_indexing(
     client: &QdrantClient,
     collection_name: &str,
@@ -216,6 +222,7 @@ pub async fn disable_indexing(
     Ok(())
 }
 
+/// Enable indexing
 pub async fn enable_indexing(
     client: &QdrantClient,
     collection_name: &str,
@@ -224,6 +231,7 @@ pub async fn enable_indexing(
     Ok(())
 }
 
+/// Set indexing threshold
 pub async fn set_indexing_threshold(
     client: &QdrantClient,
     collection_name: &str,
@@ -245,6 +253,7 @@ pub async fn set_indexing_threshold(
     Ok(())
 }
 
+/// Get collection status
 pub async fn get_collection_status(
     client: &QdrantClient,
     collection_name: &str,
@@ -262,6 +271,7 @@ pub async fn get_collection_status(
     Ok(CollectionStatus::from_i32(status).unwrap())
 }
 
+/// Wait for collection to be indexed
 pub async fn wait_index(
     client: &QdrantClient,
     collection_name: &str,
@@ -287,6 +297,7 @@ pub async fn wait_index(
     Ok(start.elapsed().as_secs_f64())
 }
 
+/// Create collection
 pub async fn create_collection(
     client: &QdrantClient,
     collection_name: &str,
@@ -386,4 +397,62 @@ pub async fn insert_points_batch(
             ))?;
     }
     Ok(())
+}
+
+/// Create collection snapshot
+pub async fn create_collection_snapshot(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<CreateSnapshotResponse, anyhow::Error> {
+    client
+        .create_snapshot(&collection_name)
+        .await
+        .context(format!(
+            "Failed to create collection snapshot for {}",
+            collection_name
+        ))
+}
+
+/// Delete collection snapshot by name
+pub async fn delete_collection_snapshot(
+    client: &QdrantClient,
+    collection_name: &str,
+    snapshot_name: &str,
+) -> Result<(), anyhow::Error> {
+    client
+        .delete_snapshot(&collection_name, snapshot_name)
+        .await
+        .context(format!(
+            "Failed to delete collection snapshot {} for {}",
+            snapshot_name, collection_name
+        ))?;
+    Ok(())
+}
+
+/// List collection snapshots
+pub async fn list_collection_snapshots(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<Vec<String>, anyhow::Error> {
+    let snapshots = client
+        .list_snapshots(&collection_name)
+        .await
+        .context(format!(
+            "Failed to list collection snapshots for {}",
+            collection_name
+        ))?
+        .snapshot_descriptions;
+    Ok(snapshots
+        .into_iter()
+        .map(|s| s.name)
+        .collect::<Vec<String>>())
+}
+
+/// Count collection snapshots
+pub async fn count_collection_snapshots(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<usize, anyhow::Error> {
+    let snapshots = list_collection_snapshots(client, collection_name).await?;
+    Ok(snapshots.len())
 }
