@@ -127,7 +127,7 @@ impl Drill for HighConcurrency {
         }
 
         // create collection
-        create_collection(client, &self.collection_name, args.clone()).await?;
+        create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
 
         // workers will target random clients for all nodes to stress the cluster
         let mut target_clients = vec![];

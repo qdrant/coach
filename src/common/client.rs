@@ -290,6 +290,7 @@ pub async fn wait_index(
 pub async fn create_collection(
     client: &QdrantClient,
     collection_name: &str,
+    vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
     client
@@ -297,7 +298,7 @@ pub async fn create_collection(
             collection_name: collection_name.to_string(),
             vectors_config: Some(VectorsConfig {
                 config: Some(Config::Params(VectorParams {
-                    size: 128,
+                    size: vec_dim as u64,
                     distance: Distance::Cosine.into(),
                 })),
             }),
@@ -330,6 +331,7 @@ pub async fn delete_collection(
 pub async fn recreate_collection(
     client: &QdrantClient,
     collection_name: &str,
+    vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
     if client.has_collection(&collection_name).await? {
@@ -337,7 +339,7 @@ pub async fn recreate_collection(
         delete_collection(client, collection_name).await?;
         sleep(Duration::from_secs(2)).await;
     }
-    create_collection(client, collection_name, args).await
+    create_collection(client, collection_name, vec_dim, args).await
 }
 
 /// insert points into collection (blocking)

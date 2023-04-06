@@ -52,7 +52,7 @@ impl Drill for PointsUpdate {
         // create if does not exists
         if !client.has_collection(&self.collection_name).await? {
             log::info!("The update drill needs to setup the collection first");
-            create_collection(client, &self.collection_name, args.clone()).await?;
+            create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
 
             // insert some points
             insert_points_batch(
@@ -111,7 +111,7 @@ impl Drill for PointsUpdate {
     async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
-            recreate_collection(client, &self.collection_name, args.clone()).await?;
+            recreate_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
             // insert some points
             insert_points_batch(
                 client,

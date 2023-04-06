@@ -60,7 +60,7 @@ impl Drill for ToggleIndexing {
         }
 
         // create collection
-        create_collection(client, &self.collection_name, args.clone()).await?;
+        create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
 
         // disable indexing
         disable_indexing(client, &self.collection_name).await?;

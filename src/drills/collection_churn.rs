@@ -50,7 +50,7 @@ impl Drill for CollectionChurn {
 
         sleep(Duration::from_secs(1)).await;
 
-        create_collection(client, &self.collection_name, args.clone()).await?;
+        create_collection(client, &self.collection_name, 128, args.clone()).await?;
 
         if self.stopped.load(Ordering::Relaxed) {
             return Err(Cancelled);
