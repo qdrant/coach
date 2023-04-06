@@ -19,7 +19,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
         let stopped = stopped.clone();
         let handle = tokio::spawn(async move {
             // use `grpc_health_check_timeout_ms` as client timeout
-            let client_config = get_config(&uri, args.grpc_health_check_timeout_ms);
+            let client_config = get_config([&uri], args.grpc_health_check_timeout_ms);
             let client = QdrantClient::new(Some(client_config)).await;
             // fails only if the configuration is invalid
             if let Err(e) = client {

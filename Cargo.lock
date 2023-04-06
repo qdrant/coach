@@ -1116,8 +1116,7 @@ dependencies = [
 [[package]]
 name = "qdrant-client"
 version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11af8efffb952b3d93165ca52a3ca0609c9c1d360fb04a9424f7ecb7b148ef61"
+source = "git+https://github.com/qdrant/rust-client.git?branch=add-tonic-load-balanced-channel-support#0d5404310870ef9f2f3a8784ff2e95eb8198b511"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -1126,6 +1125,7 @@ dependencies = [
  "reqwest",
  "tonic",
  "tonic-build",
+ "tower",
 ]
 
 [[package]]
@@ -1702,6 +1702,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ce8c33a8d48bd45d624a6e523445fd21ec13d3653cd51f681abf67418f54eb8"
 dependencies = [
  "cfg-if",
+ "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",

@@ -86,9 +86,9 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     let max_drill_semaphore = Arc::new(Semaphore::new(args.parallel_drills));
     let uris_len = args.uris.len();
     let args_arc = Arc::new(args);
-    let first_uri = &args_arc.uris.first().expect("Not empty per construction");
+    let first_uri = args_arc.uris.first().expect("Not empty per construction");
     let before_client =
-        QdrantClient::new(Some(get_config(first_uri, args_arc.grpc_timeout_ms))).await?;
+        QdrantClient::new(Some(get_config([first_uri], args_arc.grpc_timeout_ms))).await?;
     // pick first uri to run before_all
     let before_client_arc = Arc::new(before_client);
     // run drills
@@ -125,46 +125,49 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                 let mut drill_reports = vec![];
                 // run drill against all uri sequentially
                 debug!("Starting {}", drill.name());
-                for uri in &args_arc.uris {
-                    if stopped.load(Ordering::Relaxed) {
-                        // stop drill
-                        return;
-                    }
-                    let drill_client =
-                        QdrantClient::new(Some(get_config(uri, args_arc.grpc_timeout_ms)))
-                            .await
-                            .unwrap();
-                    let execution_start = Instant::now();
-                    let result = drill.run(&drill_client, args_arc.clone()).await;
-                    match result {
-                        Ok(_) => {
-                            if let Some(_prev) = last_errors.remove(uri) {
-                                info!("{} is working again for {}", drill.name(), uri);
-                            }
-                            drill_reports.push(DrillReport {
-                                uri: uri.to_string(),
-                                duration: execution_start.elapsed(),
-                                error: None,
-                            })
-                        }
-                        Err(e @ CoachError::Client(_) | e @ CoachError::Invariant(_)) => {
-                            drill_reports.push(DrillReport {
-                                uri: uri.to_string(),
-                                duration: execution_start.elapsed(),
-                                error: Some(e.to_string()),
-                            });
-                            // do not spam logs with the same error
-                            if let Some(_prev_error) = last_errors.get(uri) {
-                                last_errors.insert(uri.to_string(), e);
-                            } else {
-                                // print warning the first time
-                                warn!("{} started to fail for {}", drill.name(), uri);
-                                last_errors.insert(uri.to_string(), e);
-                            }
-                        }
-                        Err(CoachError::Cancelled) => (),
-                    };
+
+                if stopped.load(Ordering::Relaxed) {
+                    // stop drill
+                    return;
                 }
+
+                let drill_client =
+                    QdrantClient::new(Some(get_config(&args_arc.uris, args_arc.grpc_timeout_ms)))
+                        .await
+                        .unwrap();
+
+                let execution_start = Instant::now();
+                let result = drill.run(&drill_client, args_arc.clone()).await;
+
+                let first_uri = args_arc.uris.first().unwrap();
+                match result {
+                    Ok(_) => {
+                        if let Some(_prev) = last_errors.remove(first_uri) {
+                            info!("{} is working again for {}", drill.name(), first_uri);
+                        }
+                        drill_reports.push(DrillReport {
+                            uri: first_uri.to_string(),
+                            duration: execution_start.elapsed(),
+                            error: None,
+                        })
+                    }
+                    Err(e @ CoachError::Client(_) | e @ CoachError::Invariant(_)) => {
+                        drill_reports.push(DrillReport {
+                            uri: first_uri.to_string(),
+                            duration: execution_start.elapsed(),
+                            error: Some(e.to_string()),
+                        });
+                        // do not spam logs with the same error
+                        if let Some(_prev_error) = last_errors.get(first_uri) {
+                            last_errors.insert(first_uri.to_string(), e);
+                        } else {
+                            // print warning the first time
+                            warn!("{} started to fail for {}", drill.name(), first_uri);
+                            last_errors.insert(first_uri.to_string(), e);
+                        }
+                    }
+                    Err(CoachError::Cancelled) => (),
+                };
 
                 if stopped.load(Ordering::Relaxed) {
                     // drill canceled

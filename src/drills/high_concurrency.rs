@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_collection, delete_point_by_id, disable_indexing, get_point_by_id,
+    create_collection, delete_point_by_id, get_point_by_id,
     recreate_collection, search_points, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
@@ -30,9 +30,9 @@ pub struct HighConcurrency {
 impl HighConcurrency {
     pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let collection_name = "high-concurrency".to_string();
-        let concurrency_level = 250;
+        let concurrency_level = 500;
         let number_iterations = 10000;
-        let vec_dim = 128;
+        let vec_dim = 512;
         let payload_count = 2;
         let write_concurrency = None; // default
         HighConcurrency {
@@ -101,7 +101,7 @@ impl Drill for HighConcurrency {
     }
 
     fn reschedule_after_sec(&self) -> u64 {
-        10
+        0
     }
 
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
@@ -112,7 +112,7 @@ impl Drill for HighConcurrency {
         }
 
         // disable HNSW indexing (just in case)
-        disable_indexing(client, &self.collection_name).await?;
+        // disable_indexing(client, &self.collection_name).await?;
 
         // lazy stream of futures
         let query_stream = (0..self.number_iterations)
@@ -121,13 +121,13 @@ impl Drill for HighConcurrency {
 
         let mut upsert_stream =
             futures::stream::iter(query_stream).buffer_unordered(self.concurrency_level);
-        while let Some(result) = upsert_stream.next().await {
-            // stop on first error
-            result?;
+
+        while let Some(Err(err)) = upsert_stream.next().await {
+            log::error!("Something errored out during high-concurrency drill 🥲: {err}");
         }
 
         // delete collection to not accumulate data over time
-        delete_collection(client, &self.collection_name).await?;
+        // delete_collection(client, &self.collection_name).await?;
 
         Ok(())
     }

@@ -52,8 +52,11 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_config(url: &str, timeout_ms: usize) -> QdrantClientConfig {
-    let mut config = QdrantClientConfig::from_url(url);
+fn get_config(
+    urls: impl IntoIterator<Item = impl Into<String>>,
+    timeout_ms: usize,
+) -> QdrantClientConfig {
+    let mut config = QdrantClientConfig::from_urls(urls);
     config.timeout = Duration::from_millis(timeout_ms as u64);
     config.connect_timeout = Duration::from_millis(timeout_ms as u64);
 
