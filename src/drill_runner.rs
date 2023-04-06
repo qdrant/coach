@@ -158,7 +158,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                                 last_errors.insert(uri.to_string(), e);
                             } else {
                                 // print warning the first time
-                                warn!("{} started to fail for {}", drill.name(), uri);
+                                warn!("{} started to fail for {} with {}", drill.name(), uri, e);
                                 last_errors.insert(uri.to_string(), e);
                             }
                         }
