@@ -27,7 +27,7 @@ impl CollectionSnapshotsChurn {
         let collection_name = "collection-snapshot-drill".to_string();
         let vec_dim = 128;
         let payload_count = 2;
-        let points_count = 100_000;
+        let points_count = 200_000;
         CollectionSnapshotsChurn {
             collection_name,
             points_count,
