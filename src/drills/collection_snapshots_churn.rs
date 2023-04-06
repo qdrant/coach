@@ -1,11 +1,11 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use qdrant_client::client::QdrantClient;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, get_points_count, insert_points_batch, recreate_collection, wait_index,
+    create_collection, disable_indexing, get_points_count, insert_points_batch, recreate_collection,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Invariant;
@@ -27,7 +27,7 @@ impl CollectionSnapshotsChurn {
         let collection_name = "collection-snapshot-drill".to_string();
         let vec_dim = 128;
         let payload_count = 2;
-        let points_count = 10000;
+        let points_count = 100_000;
         CollectionSnapshotsChurn {
             collection_name,
             points_count,
@@ -51,8 +51,11 @@ impl Drill for CollectionSnapshotsChurn {
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // create and populate collection if it does not exists
         if !client.has_collection(&self.collection_name).await? {
-            log::info!("The collection snapshot churn drill needs to setup the collection first");
+            // create collection
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
+
+            // disable indexing
+            disable_indexing(client, &self.collection_name).await?;
 
             // insert some points
             insert_points_batch(
@@ -65,18 +68,15 @@ impl Drill for CollectionSnapshotsChurn {
                 self.stopped.clone(),
             )
             .await?;
+        }
 
-            // waiting for green status
-            wait_index(client, &self.collection_name, self.stopped.clone()).await?;
-
-            // assert point count
-            let points_count = get_points_count(client, &self.collection_name).await?;
-            if points_count != self.points_count {
-                return Err(Invariant(format!(
-                    "Collection has wrong number of points after insert {} vs {}",
-                    points_count, self.points_count
-                )));
-            }
+        // assert point count
+        let points_count = get_points_count(client, &self.collection_name).await?;
+        if points_count != self.points_count {
+            return Err(Invariant(format!(
+                "Collection has wrong number of points after insert {} vs {}",
+                points_count, self.points_count
+            )));
         }
 
         // number of snapshots before
@@ -87,14 +87,26 @@ impl Drill for CollectionSnapshotsChurn {
             .len();
 
         // create snapshot
-        let snapshot = client.create_snapshot(&self.collection_name).await?;
+        let snapshot = client
+            .create_snapshot(&self.collection_name)
+            .await
+            .context(format!(
+                "Failed to create collection snapshot for collection {}",
+                &self.collection_name
+            ))?;
 
         // number of snapshots before
         let post_create_snapshot_count = client
             .list_snapshots(&self.collection_name)
-            .await?
+            .await
+            .context(format!(
+                "Failed to list collection snapshots for collection {}",
+                &self.collection_name
+            ))?
             .snapshot_descriptions
             .len();
+
+        // assert snapshot count before
         if post_create_snapshot_count != snapshot_count + 1 {
             return Err(Invariant(format!(
                 "Collection snapshot count is wrong {} vs {}",
@@ -104,19 +116,27 @@ impl Drill for CollectionSnapshotsChurn {
         }
 
         // delete snapshot
+        let snapshot_name = snapshot.snapshot_description.unwrap().name;
         client
-            .delete_snapshot(
-                &self.collection_name,
-                &snapshot.snapshot_description.unwrap().name,
-            )
-            .await?;
+            .delete_snapshot(&self.collection_name, &snapshot_name)
+            .await
+            .context(format!(
+                "Failed to delete collection snapshot {}",
+                snapshot_name
+            ))?;
 
         // number of snapshots before
         let post_delete_snapshot_count = client
             .list_snapshots(&self.collection_name)
-            .await?
+            .await
+            .context(format!(
+                "Failed to list collection snapshots for collection {}",
+                &self.collection_name
+            ))?
             .snapshot_descriptions
             .len();
+
+        // assert snapshot count after
         if post_delete_snapshot_count != snapshot_count {
             return Err(Invariant(format!(
                 "Collection snapshot count is wrong {} vs {}",
