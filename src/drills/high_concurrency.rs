@@ -5,11 +5,12 @@ use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_collection, delete_point_by_id, disable_indexing, get_point_by_id,
-    search_points, set_payload, upsert_point_by_id,
+    create_collection, delete_collection, delete_point_by_id, get_point_by_id, search_points,
+    set_payload, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
 use crate::drill_runner::Drill;
+use crate::get_config;
 use async_trait::async_trait;
 use futures::StreamExt;
 use qdrant_client::qdrant::WriteOrdering;
@@ -30,8 +31,8 @@ pub struct HighConcurrency {
 impl HighConcurrency {
     pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let collection_name = "high-concurrency".to_string();
-        let concurrency_level = 300;
-        let number_iterations = 30000;
+        let concurrency_level = 400;
+        let number_iterations = 40000;
         let vec_dim = 128;
         let payload_count = 2;
         let write_concurrency = None; // default
@@ -102,6 +103,11 @@ impl HighConcurrency {
 
         Ok(())
     }
+
+    fn pick_random<'a>(&self, clients: &'a Vec<QdrantClient>) -> &'a QdrantClient {
+        let index = rand::random::<usize>() % clients.len();
+        &clients[index]
+    }
 }
 
 #[async_trait]
@@ -123,16 +129,24 @@ impl Drill for HighConcurrency {
         // create collection
         create_collection(client, &self.collection_name, args.clone()).await?;
 
-        // disable HNSW indexing (just in case)
-        disable_indexing(client, &self.collection_name).await?;
+        // workers will target random clients for all nodes to stress the cluster
+        let mut target_clients = vec![];
+        for uri in &args.uris {
+            let target_client =
+                QdrantClient::new(Some(get_config(uri, args.grpc_timeout_ms))).await?;
+            target_clients.push(target_client);
+        }
 
         // lazy stream of futures
         let query_stream = (0..self.number_iterations)
             .take_while(|_| !self.stopped.load(Ordering::Relaxed))
-            .map(|n| self.run_for_point(client, n as u64));
+            .map(|n| self.run_for_point(self.pick_random(&target_clients), n as u64));
 
+        // at most self.concurrency_level futures will be running at the same time
         let mut upsert_stream =
             futures::stream::iter(query_stream).buffer_unordered(self.concurrency_level);
+
+        // consume stream
         while let Some(result) = upsert_stream.next().await {
             // stop on first error
             result?;
