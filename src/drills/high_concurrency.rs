@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::args::Args;
 use crate::common::client::{
     create_collection, delete_collection, delete_point_by_id, disable_indexing, get_point_by_id,
-    recreate_collection, search_points, set_payload, upsert_point_by_id,
+    search_points, set_payload, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
 use crate::drill_runner::Drill;
@@ -30,8 +30,8 @@ pub struct HighConcurrency {
 impl HighConcurrency {
     pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let collection_name = "high-concurrency".to_string();
-        let concurrency_level = 250;
-        let number_iterations = 10000;
+        let concurrency_level = 300;
+        let number_iterations = 30000;
         let vec_dim = 128;
         let payload_count = 2;
         let write_concurrency = None; // default
@@ -115,11 +115,13 @@ impl Drill for HighConcurrency {
     }
 
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
-        // create and populate collection if it does not exists
-        if !client.has_collection(&self.collection_name).await? {
-            log::info!("The high concurrency drill needs to setup the collection first");
-            create_collection(client, &self.collection_name, args.clone()).await?;
+        // delete if already exists
+        if client.has_collection(&self.collection_name).await? {
+            delete_collection(client, &self.collection_name).await?;
         }
+
+        // create collection
+        create_collection(client, &self.collection_name, args.clone()).await?;
 
         // disable HNSW indexing (just in case)
         disable_indexing(client, &self.collection_name).await?;
@@ -142,11 +144,9 @@ impl Drill for HighConcurrency {
         Ok(())
     }
 
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
-        // honor args.recreate_collection
-        if args.recreate_collection {
-            recreate_collection(client, &self.collection_name, args.clone()).await?;
-        }
+    async fn before_all(&self, _client: &QdrantClient, _args: Arc<Args>) -> Result<(), CoachError> {
+        // no need to explicitly honor args.recreate_collection
+        // because we are going to delete the collection anyway
         Ok(())
     }
 }
