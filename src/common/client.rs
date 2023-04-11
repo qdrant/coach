@@ -227,7 +227,8 @@ pub async fn enable_indexing(
     client: &QdrantClient,
     collection_name: &str,
 ) -> Result<(), anyhow::Error> {
-    set_indexing_threshold(client, collection_name, 1).await?;
+    // 1000 is the min possible value
+    set_indexing_threshold(client, collection_name, 1000).await?;
     Ok(())
 }
 
