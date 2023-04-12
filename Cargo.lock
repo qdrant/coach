@@ -1115,9 +1115,9 @@ dependencies = [
 
 [[package]]
 name = "qdrant-client"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11af8efffb952b3d93165ca52a3ca0609c9c1d360fb04a9424f7ecb7b148ef61"
+checksum = "3ba69c5bb36e481ba1ad871c2a8c0d39e37269ad413caf96665b0cf6f82e7a97"
 dependencies = [
  "anyhow",
  "futures-util",

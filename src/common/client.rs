@@ -312,6 +312,8 @@ pub async fn create_collection(
                 config: Some(Config::Params(VectorParams {
                     size: vec_dim as u64,
                     distance: Distance::Cosine.into(),
+                    hnsw_config: None,
+                    quantization_config: None,
                 })),
             }),
             replication_factor: Some(args.replication_factor as u32),
