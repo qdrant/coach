@@ -31,7 +31,7 @@ pub async fn get_point_by_id(
     let point = client
         .get_points(
             collection_name,
-            &vec![point_id_grpc],
+            &[point_id_grpc],
             with_vectors,
             with_payload,
             None,
