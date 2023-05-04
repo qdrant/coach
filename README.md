@@ -36,6 +36,8 @@ Options:
           Maximum size (in KiloBytes) of vectors to store in-memory per segment
       --recreate-collection
           Always create collection before the first run of a drill
+      --use-scalar-quantization
+          Whether to use scalar quantization for vectors
       --stop-at-first-error
           Stop all drills at the first error encountered
       --only-healthcheck

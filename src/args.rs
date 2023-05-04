@@ -25,6 +25,9 @@ pub struct Args {
     /// Always create collection before the first run of a drill
     #[arg(long, default_value_t = false)]
     pub recreate_collection: bool,
+    /// Whether to use scalar quantization for vectors
+    #[arg(long, default_value_t = false)]
+    pub use_scalar_quantization: bool,
     /// Stop all drills at the first error encountered
     #[arg(long, default_value_t = false)]
     pub stop_at_first_error: bool,

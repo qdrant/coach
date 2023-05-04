@@ -6,12 +6,13 @@ use anyhow::Context;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
+use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
     CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance, OptimizersConfigDiff,
-    PointId, PointStruct, PointsIdsList, PointsSelector, RetrievedPoint, SearchPoints,
-    SearchResponse, VectorParams, VectorsConfig, WithPayloadSelector, WithVectorsSelector,
-    WriteOrdering,
+    PointId, PointStruct, PointsIdsList, PointsSelector, QuantizationConfig, RetrievedPoint,
+    ScalarQuantization, SearchPoints, SearchResponse, VectorParams, VectorsConfig,
+    WithPayloadSelector, WithVectorsSelector, WriteOrdering,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -323,6 +324,17 @@ pub async fn create_collection(
                 memmap_threshold: args.memmap_threshold.map(|i| i as u64),
                 ..Default::default()
             }),
+            quantization_config: if args.use_scalar_quantization {
+                Some(QuantizationConfig {
+                    quantization: Some(Quantization::Scalar(ScalarQuantization {
+                        r#type: 1, //Int8
+                        quantile: None,
+                        always_ram: Some(true),
+                    })),
+                })
+            } else {
+                None
+            },
             ..Default::default()
         })
         .await
