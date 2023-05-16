@@ -123,6 +123,21 @@ impl Drill for CollectionSnapshotsChurn {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
+
+            // disable indexing
+            disable_indexing(client, &self.collection_name).await?;
+
+            // insert some points
+            insert_points_batch(
+                client,
+                &self.collection_name,
+                self.points_count,
+                self.vec_dim,
+                self.payload_count,
+                None,
+                self.stopped.clone(),
+            )
+            .await?;
         }
         Ok(())
     }
