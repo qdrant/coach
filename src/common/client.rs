@@ -9,9 +9,9 @@ use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance, OptimizersConfigDiff,
-    PointId, PointStruct, PointsIdsList, PointsSelector, QuantizationConfig, RetrievedPoint,
-    ScalarQuantization, SearchPoints, SearchResponse, VectorParams, VectorsConfig,
+    CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance, GetResponse,
+    OptimizersConfigDiff, PointId, PointStruct, PointsIdsList, PointsSelector, QuantizationConfig,
+    RetrievedPoint, ScalarQuantization, SearchPoints, SearchResponse, VectorParams, VectorsConfig,
     WithPayloadSelector, WithVectorsSelector, WriteOrdering,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -161,6 +161,32 @@ pub async fn search_points(
         })
         .await
         .context(format!("Failed to search points on {}", collection_name))?;
+
+    Ok(response)
+}
+
+/// Retrieve points
+pub async fn retrieve_points(
+    client: &QdrantClient,
+    collection_name: &str,
+    ids: &[usize],
+) -> Result<GetResponse, anyhow::Error> {
+    // type inference issues forces to ascribe the types :shrug:
+    let with_vectors: Option<WithVectorsSelector> = Some(true.into());
+    let with_payload: Option<WithPayloadSelector> = None;
+    let response = client
+        .get_points(
+            collection_name,
+            ids.iter()
+                .map(|id| (*id as u64).into())
+                .collect::<Vec<_>>()
+                .as_slice(),
+            with_vectors,
+            with_payload,
+            None,
+        )
+        .await
+        .context(format!("Failed to retrieve points on {}", collection_name))?;
 
     Ok(response)
 }
