@@ -9,10 +9,11 @@ use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance, GetResponse,
-    OptimizersConfigDiff, PointId, PointStruct, PointsIdsList, PointsSelector, QuantizationConfig,
-    RetrievedPoint, ScalarQuantization, SearchPoints, SearchResponse, VectorParams, VectorsConfig,
-    WithPayloadSelector, WithVectorsSelector, WriteOrdering,
+    CollectionInfo, CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance,
+    FieldType, GetResponse, OptimizersConfigDiff, PointId, PointStruct, PointsIdsList,
+    PointsSelector, QuantizationConfig, RetrievedPoint, ScalarQuantization, SearchPoints,
+    SearchResponse, VectorParams, VectorsConfig, WithPayloadSelector, WithVectorsSelector,
+    WriteOrdering,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -281,12 +282,12 @@ pub async fn set_indexing_threshold(
     Ok(())
 }
 
-/// Get collection status
-pub async fn get_collection_status(
+/// Get collection info
+pub async fn get_collection_info(
     client: &QdrantClient,
     collection_name: &str,
-) -> Result<CollectionStatus, anyhow::Error> {
-    let status = client
+) -> Result<CollectionInfo, anyhow::Error> {
+    let collection_info = client
         .collection_info(collection_name)
         .await
         .context(format!(
@@ -294,6 +295,17 @@ pub async fn get_collection_status(
             collection_name
         ))?
         .result
+        .unwrap();
+    Ok(collection_info)
+}
+
+/// Get collection status
+pub async fn get_collection_status(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<CollectionStatus, anyhow::Error> {
+    let status = get_collection_info(client, collection_name)
+        .await
         .unwrap()
         .status;
     Ok(CollectionStatus::from_i32(status).unwrap())
@@ -496,4 +508,26 @@ pub async fn count_collection_snapshots(
 ) -> Result<usize, anyhow::Error> {
     let snapshots = list_collection_snapshots(client, collection_name).await?;
     Ok(snapshots.len())
+}
+
+pub async fn create_field_index(
+    client: &QdrantClient,
+    collection_name: &str,
+    field_name: &str,
+    field_type: FieldType,
+) -> Result<(), anyhow::Error> {
+    client
+        .create_field_index_blocking(
+            collection_name.to_string(),
+            field_name.to_string(),
+            field_type,
+            None,
+            None,
+        )
+        .await
+        .context(format!(
+            "Failed to create field index {} for collection {}",
+            field_name, collection_name
+        ))?;
+    Ok(())
 }

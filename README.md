@@ -14,6 +14,7 @@ Those drills are run continuously to detect unexpected behaviors over a long per
 - `toggle_indexing`: drill that toggles indexing once it is populated.
 - `high_concurrency`: drill that performs high concurrency requests on a collection.
 - `large_retrieve`: drill that retrieves a large number of points on a collection.
+- `collection_concurrent_lifecycle`: drill that performs concurrent collection lifecycle operations.
 
 ## usage
 

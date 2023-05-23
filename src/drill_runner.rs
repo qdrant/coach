@@ -1,6 +1,7 @@
 use crate::args::Args;
 use crate::common::coach_errors::CoachError;
 use crate::drills::collection_churn::CollectionChurn;
+use crate::drills::collection_concurrent_lifecycle::CollectionConcurrentLifecycle;
 use crate::drills::collection_snapshots_churn::CollectionSnapshotsChurn;
 use crate::drills::high_concurrency::HighConcurrency;
 use crate::drills::large_retrieve::LargeRetrieve;
@@ -54,6 +55,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
         Box::new(ToggleIndexing::new(stopped.clone())),
         Box::new(HighConcurrency::new(stopped.clone())),
         Box::new(LargeRetrieve::new(stopped.clone())),
+        Box::new(CollectionConcurrentLifecycle::new(stopped.clone())),
     ];
 
     // filter drills by name
