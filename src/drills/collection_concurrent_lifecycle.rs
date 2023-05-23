@@ -79,6 +79,9 @@ impl Drill for CollectionConcurrentLifecycle {
         }
 
         while let Some(result) = creations.next().await {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
             match result {
                 Ok(_) => {} // at least one creation should be successful
                 Err(e) => {
@@ -128,6 +131,9 @@ impl Drill for CollectionConcurrentLifecycle {
         }
 
         while let Some(result) = deletions.next().await {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
             match result {
                 Ok(_) => {}
                 Err(e) => {
