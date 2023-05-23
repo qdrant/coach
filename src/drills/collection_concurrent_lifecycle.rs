@@ -34,7 +34,7 @@ impl CollectionConcurrentLifecycle {
         let collection_name = "collection-concurrent-lifecycle-drill".to_string();
         let vec_dim = 512;
         let payload_count = 2;
-        let points_count = 20000;
+        let points_count = 50000;
         let parallelism = 20;
         CollectionConcurrentLifecycle {
             collection_name,
