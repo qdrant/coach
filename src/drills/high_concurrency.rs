@@ -132,8 +132,7 @@ impl Drill for HighConcurrency {
         // workers will target random clients for all nodes to stress the cluster
         let mut target_clients = vec![];
         for uri in &args.uris {
-            let target_client =
-                QdrantClient::new(Some(get_config(uri, args.grpc_timeout_ms))).await?;
+            let target_client = QdrantClient::new(Some(get_config(uri, args.grpc_timeout_ms)))?;
             target_clients.push(target_client);
         }
 

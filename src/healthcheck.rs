@@ -22,7 +22,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             let client_config = get_config(&uri, 60 * 1000);
             // validate timeout manually
             let max_healthcheck_timeout_ms = args.grpc_health_check_timeout_ms as u64;
-            let client = QdrantClient::new(Some(client_config)).await;
+            let client = QdrantClient::new(Some(client_config));
             // fails only if the configuration is invalid
             if let Err(e) = client {
                 error!("Failed to create healthcheck client for {}: {}", uri, e);

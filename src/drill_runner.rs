@@ -91,8 +91,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     let uris_len = args.uris.len();
     let args_arc = Arc::new(args);
     let first_uri = &args_arc.uris.first().expect("Not empty per construction");
-    let before_client =
-        QdrantClient::new(Some(get_config(first_uri, args_arc.grpc_timeout_ms))).await?;
+    let before_client = QdrantClient::new(Some(get_config(first_uri, args_arc.grpc_timeout_ms)))?;
     // pick first uri to run before_all
     let before_client_arc = Arc::new(before_client);
     // run drills
@@ -135,9 +134,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                         return;
                     }
                     let drill_client =
-                        QdrantClient::new(Some(get_config(uri, args_arc.grpc_timeout_ms)))
-                            .await
-                            .unwrap();
+                        QdrantClient::new(Some(get_config(uri, args_arc.grpc_timeout_ms))).unwrap();
                     let execution_start = Instant::now();
                     let result = drill.run(&drill_client, args_arc.clone()).await;
                     match result {
