@@ -13,6 +13,9 @@ pub struct Args {
     /// Replication factor for collections
     #[arg(long, default_value_t = 1)]
     pub replication_factor: usize,
+    /// Number of shards for collections (`0` let the cluster decide)
+    #[arg(long, default_value_t = 0)]
+    pub shard_number: usize,
     /// Writing consistency factor for collections
     #[arg(long, default_value_t = 1)]
     pub write_consistency_factor: usize,

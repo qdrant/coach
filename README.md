@@ -30,6 +30,8 @@ Options:
           Number of parallel drills to run [default: 2]
       --replication-factor <REPLICATION_FACTOR>
           Replication factor for collections [default: 1]
+      --shard-number <SHARD_NUMBER>
+          Number of shards for collections (`0` let the cluster decide) [default: 0]
       --write-consistency-factor <WRITE_CONSISTENCY_FACTOR>
           Writing consistency factor for collections [default: 1]
       --indexing-threshold <INDEXING_THRESHOLD>

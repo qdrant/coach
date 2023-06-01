@@ -2,7 +2,6 @@ use anyhow::Result;
 use qdrant_client::client::QdrantClient;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::args::Args;
 use crate::common::client::{
@@ -14,9 +13,8 @@ use crate::common::generators::KEYWORD_PAYLOAD_KEY;
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
 use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures::{stream, StreamExt};
 use qdrant_client::qdrant::FieldType;
-use tokio::time::sleep;
 
 /// Drill that creates and deletes a collection in parallel.
 /// The collection is created and populated with random data if it does not exist.
@@ -67,9 +65,7 @@ impl Drill for CollectionConcurrentLifecycle {
             return Err(Cancelled);
         }
 
-        sleep(Duration::from_secs(1)).await;
-
-        // concurrent create collection
+        // test concurrent create collection
         let mut creations = FuturesUnordered::new();
         for _ in 0..1 {
             let args = args.clone();
@@ -124,7 +120,7 @@ impl Drill for CollectionConcurrentLifecycle {
         )
         .await?;
 
-        // concurrent delete collection
+        // test concurrent delete collection
         let mut deletions = FuturesUnordered::new();
         for _ in 0..self.parallelism {
             deletions.push(async move { delete_collection(client, &self.collection_name).await });
@@ -142,6 +138,62 @@ impl Drill for CollectionConcurrentLifecycle {
                         e
                     )))
                 }
+            }
+        }
+
+        // test mixed concurrent create and delete (1 vs 1)
+        let mut creations = Vec::new();
+        for _ in 0..self.parallelism {
+            let args = args.clone();
+            creations.push(async move {
+                create_collection(client, &self.collection_name, self.vec_dim, args).await
+            });
+        }
+        let mut creations_stream = stream::iter(creations).buffer_unordered(1);
+
+        let mut deletions = Vec::new();
+        for _ in 0..self.parallelism {
+            deletions.push(async move { delete_collection(client, &self.collection_name).await });
+        }
+        let mut deletions_stream = stream::iter(deletions).buffer_unordered(1);
+
+        loop {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
+            // make sure the collection does not exist (do not care about this result)
+            let _clean = delete_collection(client, &self.collection_name).await?;
+            // race between 1 creation and 1 deletion
+            tokio::select! {
+                Some(creation_res) = creations_stream.next() => {
+                     match creation_res {
+                        Ok(_) => {},
+                        Err(e) => {
+                            let msg = format!("{:?}", e);
+                            if !msg.contains(&format!(
+                                "Collection `{}` already exists!",
+                                self.collection_name
+                            )) {
+                                return Err(Invariant(format!(
+                                    "Creating collection failed for the wrong reason - {:?}",
+                                    msg
+                                )));
+                            }
+                        }
+                    }
+                },
+                Some(deletion_res) = deletions_stream.next() => {
+                    match deletion_res {
+                        Ok(_) => {},
+                        Err(e) => {
+                            return Err(Invariant(format!(
+                                "Deleting collection should not fail - {:?}",
+                                e
+                            )))
+                        }
+                    }
+                },
+                else => break,
             }
         }
 

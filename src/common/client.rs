@@ -357,6 +357,11 @@ pub async fn create_collection(
                 })),
             }),
             replication_factor: Some(args.replication_factor as u32),
+            shard_number: if args.shard_number == 0 {
+                None
+            } else {
+                Some(args.shard_number as u32)
+            },
             write_consistency_factor: Some(args.write_consistency_factor as u32),
             optimizers_config: Some(OptimizersConfigDiff {
                 indexing_threshold: args.indexing_threshold.map(|i| i as u64),
