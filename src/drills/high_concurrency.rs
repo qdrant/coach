@@ -9,6 +9,7 @@ use crate::common::client::{
     set_payload, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
+use crate::common::coach_errors::CoachError::Cancelled;
 use crate::drill_runner::Drill;
 use crate::get_config;
 use async_trait::async_trait;
@@ -138,7 +139,6 @@ impl Drill for HighConcurrency {
 
         // lazy stream of futures
         let query_stream = (0..self.number_iterations)
-            .take_while(|_| !self.stopped.load(Ordering::Relaxed))
             .map(|n| self.run_for_point(self.pick_random(&target_clients), n as u64));
 
         // at most self.concurrency_level futures will be running at the same time
@@ -147,7 +147,11 @@ impl Drill for HighConcurrency {
 
         // consume stream
         while let Some(result) = upsert_stream.next().await {
-            // stop on first error
+            // stop consuming stream on shutdown
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
+            // stop consuming stream on first error
             result?;
         }
 
