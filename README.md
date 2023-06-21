@@ -42,6 +42,8 @@ Options:
           Always create collection before the first run of a drill
       --use-scalar-quantization
           Whether to use scalar quantization for vectors
+      --vectors-on-disk
+          If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM
       --stop-at-first-error
           Stop all drills at the first error encountered
       --only-healthcheck

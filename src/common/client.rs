@@ -353,7 +353,7 @@ pub async fn create_collection(
                     distance: Distance::Cosine.into(),
                     hnsw_config: None,
                     quantization_config: None,
-                    on_disk: None,
+                    on_disk: Some(args.vectors_on_disk),
                 })),
             }),
             replication_factor: Some(args.replication_factor as u32),

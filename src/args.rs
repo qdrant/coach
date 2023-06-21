@@ -31,6 +31,9 @@ pub struct Args {
     /// Whether to use scalar quantization for vectors
     #[arg(long, default_value_t = false)]
     pub use_scalar_quantization: bool,
+    /// If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM.
+    #[arg(long, default_value_t = false)]
+    pub vectors_on_disk: bool,
     /// Stop all drills at the first error encountered
     #[arg(long, default_value_t = false)]
     pub stop_at_first_error: bool,
