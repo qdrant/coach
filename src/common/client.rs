@@ -1,7 +1,9 @@
 use crate::args::Args;
 use crate::common::coach_errors::CoachError;
-use crate::common::coach_errors::CoachError::Cancelled;
-use crate::common::generators::{random_filter, random_payload, random_vector};
+use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
+use crate::common::generators::{
+    random_filter, random_named_vector, random_payload, random_vector,
+};
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -12,9 +14,10 @@ use qdrant_client::qdrant::{
     CollectionInfo, CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance,
     FieldType, GetResponse, OptimizersConfigDiff, PointId, PointStruct, PointsIdsList,
     PointsSelector, QuantizationConfig, RetrievedPoint, ScalarQuantization, SearchPoints,
-    SearchResponse, VectorParams, VectorsConfig, WithPayloadSelector, WithVectorsSelector,
-    WriteOrdering,
+    SearchResponse, VectorParams, VectorParamsMap, VectorsConfig, WithPayloadSelector,
+    WithVectorsSelector, WriteOrdering,
 };
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -61,7 +64,7 @@ pub async fn upsert_point_by_id(
 
     let point_struct = PointStruct::new(
         point_id_grpc,
-        random_vector(vec_dim),
+        random_named_vector(DEFAULT_VECTOR_NAME.to_string(), vec_dim),
         random_payload(Some(payload_count)),
     );
 
@@ -70,7 +73,7 @@ pub async fn upsert_point_by_id(
         .upsert_points_blocking(collection_name, points, write_ordering)
         .await
         .context(format!(
-            "Failed to update  {} in {}",
+            "Failed to update point_id:{} in {}",
             point_id, collection_name
         ))?;
 
@@ -88,7 +91,7 @@ pub async fn delete_point_by_id(
     }];
 
     // delete point
-    client
+    let resp = client
         .delete_points_blocking(
             collection_name,
             &PointsSelector {
@@ -103,7 +106,15 @@ pub async fn delete_point_by_id(
             "Failed to delete point_id {} for {}",
             point_id, collection_name
         ))?;
-    Ok(())
+    if resp.result.unwrap().status != 2 {
+        Err(anyhow::anyhow!(
+            "Failed to delete point_id {} for {}",
+            point_id,
+            collection_name
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 /// Set payload (blocking)
@@ -126,14 +137,22 @@ pub async fn set_payload(
         })),
     };
 
-    client
+    let resp = client
         .set_payload_blocking(collection_name, points_selector, payload, write_ordering)
         .await
         .context(format!(
             "Failed to set payload for {} with payload_count {}",
             collection_name, payload_count
         ))?;
-    Ok(())
+    if resp.result.unwrap().status != 2 {
+        Err(anyhow::anyhow!(
+            "Failed to set payload on point_id {} for {}",
+            point_id,
+            collection_name
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 /// Search points
@@ -156,7 +175,7 @@ pub async fn search_points(
             params: None,
             score_threshold: None,
             offset: None,
-            vector_name: None,
+            vector_name: Some(DEFAULT_VECTOR_NAME.to_string()),
             with_vectors: None,
             read_consistency: None,
         })
@@ -223,7 +242,7 @@ pub async fn delete_points(
         .collect();
 
     // delete all points
-    client
+    let resp = client
         .delete_points_blocking(
             collection_name,
             &PointsSelector {
@@ -238,7 +257,15 @@ pub async fn delete_points(
             "Failed to delete {} points for {}",
             points_count, collection_name
         ))?;
-    Ok(())
+    if resp.result.unwrap().status != 2 {
+        Err(anyhow::anyhow!(
+            "Failed to delete {} points for {}",
+            points_count,
+            collection_name
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 ///Disable indexing
@@ -286,7 +313,7 @@ pub async fn set_indexing_threshold(
 pub async fn get_collection_info(
     client: &QdrantClient,
     collection_name: &str,
-) -> Result<CollectionInfo, anyhow::Error> {
+) -> Result<Option<CollectionInfo>, anyhow::Error> {
     let collection_info = client
         .collection_info(collection_name)
         .await
@@ -294,8 +321,7 @@ pub async fn get_collection_info(
             "Failed to fetch collection info for {}",
             collection_name
         ))?
-        .result
-        .unwrap();
+        .result;
     Ok(collection_info)
 }
 
@@ -304,11 +330,19 @@ pub async fn get_collection_status(
     client: &QdrantClient,
     collection_name: &str,
 ) -> Result<CollectionStatus, anyhow::Error> {
-    let status = get_collection_info(client, collection_name)
-        .await
-        .unwrap()
-        .status;
-    Ok(CollectionStatus::from_i32(status).unwrap())
+    let info = get_collection_info(client, collection_name).await;
+    match info {
+        Ok(Some(info)) => Ok(CollectionStatus::from_i32(info.status).unwrap()),
+        Ok(None) => Err(anyhow::anyhow!(
+            "Failed to get non-empty collection status for {}",
+            collection_name
+        )),
+        Err(e) => Err(anyhow::anyhow!(
+            "Failed to get collection for {} with error: {}",
+            collection_name,
+            e
+        )),
+    }
 }
 
 /// Wait for collection to be indexed
@@ -337,6 +371,10 @@ pub async fn wait_index(
     Ok(start.elapsed().as_secs_f64())
 }
 
+/// Internal vector names
+const DEFAULT_VECTOR_NAME: &str = "default_coach_vector";
+const UNUSED_VECTOR_NAME: &str = "unused_coach_vector";
+
 /// Create collection
 pub async fn create_collection(
     client: &QdrantClient,
@@ -348,12 +386,42 @@ pub async fn create_collection(
         .create_collection(&CreateCollection {
             collection_name: collection_name.to_string(),
             vectors_config: Some(VectorsConfig {
-                config: Some(Config::Params(VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Cosine.into(),
-                    hnsw_config: None,
-                    quantization_config: None,
-                    on_disk: Some(args.vectors_on_disk),
+                config: Some(Config::ParamsMap(VectorParamsMap {
+                    map: vec![
+                        (
+                            DEFAULT_VECTOR_NAME.to_string(),
+                            VectorParams {
+                                size: vec_dim as u64,
+                                distance: Distance::Cosine.into(),
+                                hnsw_config: None,
+                                quantization_config: if args.use_scalar_quantization {
+                                    Some(QuantizationConfig {
+                                        quantization: Some(Quantization::Scalar(
+                                            ScalarQuantization {
+                                                r#type: 1, //Int8
+                                                quantile: None,
+                                                always_ram: Some(true),
+                                            },
+                                        )),
+                                    })
+                                } else {
+                                    None
+                                },
+                                on_disk: Some(args.vectors_on_disk),
+                            },
+                        ),
+                        (
+                            UNUSED_VECTOR_NAME.to_string(), // unused vector to generate more complex config
+                            VectorParams {
+                                size: vec_dim as u64,
+                                distance: Distance::Cosine.into(),
+                                on_disk: Some(args.vectors_on_disk),
+                                ..Default::default()
+                            },
+                        ),
+                    ]
+                    .into_iter()
+                    .collect::<HashMap<_, _>>(),
                 })),
             }),
             replication_factor: Some(args.replication_factor as u32),
@@ -368,17 +436,6 @@ pub async fn create_collection(
                 memmap_threshold: args.memmap_threshold.map(|i| i as u64),
                 ..Default::default()
             }),
-            quantization_config: if args.use_scalar_quantization {
-                Some(QuantizationConfig {
-                    quantization: Some(Quantization::Scalar(ScalarQuantization {
-                        r#type: 1, //Int8
-                        quantile: None,
-                        always_ram: Some(true),
-                    })),
-                })
-            } else {
-                None
-            },
             ..Default::default()
         })
         .await
@@ -438,7 +495,7 @@ pub async fn insert_points_batch(
 
             points.push(PointStruct::new(
                 point_id,
-                random_vector(vec_dim),
+                random_named_vector(DEFAULT_VECTOR_NAME.to_string(), vec_dim),
                 random_payload(Some(payload_count)),
             ));
         }
@@ -447,13 +504,23 @@ pub async fn insert_points_batch(
         }
 
         // push batch blocking
-        client
+        let resp = client
             .upsert_points_blocking(collection_name, points, write_ordering.clone())
             .await
             .context(format!(
                 "Failed to insert {} points (batch {}/{}) into {}",
                 batch_size, batch_id, num_batches, collection_name
             ))?;
+        if resp.result.clone().unwrap().status != 2 {
+            return Err(Invariant(format!(
+                "Failed to insert {} points (batch {}/{}) into {} (status {})",
+                batch_size,
+                batch_id,
+                num_batches,
+                collection_name,
+                resp.result.unwrap().status
+            )));
+        }
     }
     Ok(())
 }

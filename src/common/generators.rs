@@ -4,6 +4,7 @@ use qdrant_client::client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::{FieldCondition, Filter, Match};
 use rand::Rng;
+use std::collections::HashMap;
 
 pub const KEYWORD_PAYLOAD_KEY: &str = "a";
 
@@ -54,4 +55,11 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
 pub fn random_vector(dim: usize) -> Vec<f32> {
     let mut rng = rand::thread_rng();
     (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
+}
+
+pub fn random_named_vector(named: String, dim: usize) -> HashMap<String, Vec<f32>> {
+    let vec = random_vector(dim);
+    let mut map = HashMap::with_capacity(1);
+    map.insert(named, vec);
+    map
 }
