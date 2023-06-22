@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::args::Args;
 use crate::common::client::{
     create_collection, get_points_count, insert_points_batch, recreate_collection,
-    set_indexing_threshold, set_payload, upsert_point_by_id,
+    set_indexing_threshold, set_payload, upsert_point_by_id, wait_index,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
@@ -30,7 +30,7 @@ impl PointsOptionalVectors {
         let collection_name = "points-optional-vectors-drill".to_string();
         let vec_dim = 768;
         let payload_count = 2;
-        let points_count = 10000;
+        let points_count = 20000;
         let write_ordering = None; // default
         PointsOptionalVectors {
             collection_name,
@@ -58,6 +58,15 @@ impl Drill for PointsOptionalVectors {
         if !client.has_collection(&self.collection_name).await? {
             log::info!("The points optional vectors drill needs to setup the collection first");
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
+        } else {
+            // assert point count
+            let points_count = get_points_count(client, &self.collection_name).await?;
+            if points_count != self.points_count {
+                return Err(Invariant(format!(
+                    "Collection has wrong number of points from previous run {} vs {}",
+                    points_count, self.points_count
+                )));
+            }
         }
 
         // make sure the indexer is triggered
@@ -110,6 +119,9 @@ impl Drill for PointsOptionalVectors {
             )
             .await?;
         }
+
+        // wait for indexing
+        wait_index(client, &self.collection_name, self.stopped.clone()).await?;
 
         // assert point count
         let points_count = get_points_count(client, &self.collection_name).await?;
