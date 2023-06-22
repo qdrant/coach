@@ -1,6 +1,6 @@
 use anyhow::Result;
 use qdrant_client::client::QdrantClient;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::args::Args;
@@ -9,7 +9,7 @@ use crate::common::client::{
     upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
-use crate::common::coach_errors::CoachError::Invariant;
+use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
 use qdrant_client::qdrant::WriteOrdering;
@@ -30,7 +30,7 @@ impl PointsOptionalVectors {
         let collection_name = "points-optional-vectors-drill".to_string();
         let vec_dim = 768;
         let payload_count = 2;
-        let points_count = 10000;
+        let points_count = 20000;
         let write_ordering = None; // default
         PointsOptionalVectors {
             collection_name,
@@ -74,6 +74,9 @@ impl Drill for PointsOptionalVectors {
 
         // set payload on empty points
         for point_id in 1..self.points_count {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
             set_payload(
                 client,
                 &self.collection_name,
@@ -86,6 +89,9 @@ impl Drill for PointsOptionalVectors {
 
         // set vectors (no additional payloads)
         for point_id in 1..self.points_count {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
             upsert_point_by_id(
                 client,
                 &self.collection_name,
