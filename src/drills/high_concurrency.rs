@@ -25,7 +25,7 @@ pub struct HighConcurrency {
     number_iterations: usize,
     vec_dim: usize,
     payload_count: usize,
-    write_concurrency: Option<WriteOrdering>,
+    write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
 }
 
@@ -36,14 +36,14 @@ impl HighConcurrency {
         let number_iterations = 40000;
         let vec_dim = 128;
         let payload_count = 2;
-        let write_concurrency = None; // default
+        let write_ordering = None; // default
         HighConcurrency {
             collection_name,
             concurrency_level,
             number_iterations,
             vec_dim,
             payload_count,
-            write_concurrency,
+            write_ordering,
             stopped,
         }
     }
@@ -56,7 +56,7 @@ impl HighConcurrency {
             point_id,
             self.vec_dim,
             self.payload_count,
-            self.write_concurrency.clone(),
+            self.write_ordering.clone(),
         )
         .await?;
 
@@ -75,7 +75,7 @@ impl HighConcurrency {
             &self.collection_name,
             point_id,
             self.payload_count,
-            self.write_concurrency.clone(),
+            self.write_ordering.clone(),
         )
         .await?;
 
@@ -86,7 +86,7 @@ impl HighConcurrency {
             point_id,
             self.vec_dim,
             self.payload_count,
-            self.write_concurrency.clone(),
+            self.write_ordering.clone(),
         )
         .await?;
 

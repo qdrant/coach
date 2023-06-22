@@ -6,6 +6,7 @@ use crate::drills::collection_snapshots_churn::CollectionSnapshotsChurn;
 use crate::drills::high_concurrency::HighConcurrency;
 use crate::drills::large_retrieve::LargeRetrieve;
 use crate::drills::points_churn::PointsChurn;
+use crate::drills::points_optional_vectors::PointsOptionalVectors;
 use crate::drills::points_search::PointsSearch;
 use crate::drills::points_upsert::PointsUpdate;
 use crate::drills::toggle_indexing::ToggleIndexing;
@@ -56,6 +57,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
         Box::new(HighConcurrency::new(stopped.clone())),
         Box::new(LargeRetrieve::new(stopped.clone())),
         Box::new(CollectionConcurrentLifecycle::new(stopped.clone())),
+        Box::new(PointsOptionalVectors::new(stopped.clone())),
     ];
 
     // filter drills by name

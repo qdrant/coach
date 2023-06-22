@@ -471,6 +471,8 @@ pub async fn recreate_collection(
 }
 
 /// insert points into collection (blocking)
+/// vec_dim = 0 means no vectors
+/// payload_count = 0 means no payloads
 pub async fn insert_points_batch(
     client: &QdrantClient,
     collection_name: &str,
@@ -493,12 +495,17 @@ pub async fn insert_points_batch(
                 point_id_options: Some(PointIdOptions::Num(idx)),
             };
 
-            points.push(PointStruct::new(
-                point_id,
-                random_named_vector(DEFAULT_VECTOR_NAME.to_string(), vec_dim),
-                random_payload(Some(payload_count)),
-            ));
+            let vectors =
+                Some(random_named_vector(DEFAULT_VECTOR_NAME.to_string(), vec_dim).into());
+            let payload = random_payload(Some(payload_count)).into();
+            let point_struct = PointStruct {
+                id: Some(point_id),
+                payload,
+                vectors,
+            };
+            points.push(point_struct);
         }
+
         if stopped.load(Ordering::Relaxed) {
             return Err(Cancelled);
         }

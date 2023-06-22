@@ -4,6 +4,7 @@ pub mod collection_snapshots_churn;
 pub mod high_concurrency;
 pub mod large_retrieve;
 pub mod points_churn;
+pub mod points_optional_vectors;
 pub mod points_search;
 pub mod points_upsert;
 pub mod toggle_indexing;

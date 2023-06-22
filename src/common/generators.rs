@@ -17,7 +17,9 @@ pub fn random_keyword(num_variants: usize) -> String {
 pub fn random_payload(keywords: Option<usize>) -> Payload {
     let mut payload = Payload::new();
     if let Some(keyword_variants) = keywords {
-        payload.insert(KEYWORD_PAYLOAD_KEY, random_keyword(keyword_variants));
+        if keyword_variants > 0 {
+            payload.insert(KEYWORD_PAYLOAD_KEY, random_keyword(keyword_variants));
+        }
     }
     payload
 }
@@ -58,6 +60,9 @@ pub fn random_vector(dim: usize) -> Vec<f32> {
 }
 
 pub fn random_named_vector(named: String, dim: usize) -> HashMap<String, Vec<f32>> {
+    if dim == 0 {
+        return HashMap::new();
+    }
     let vec = random_vector(dim);
     let mut map = HashMap::with_capacity(1);
     map.insert(named, vec);

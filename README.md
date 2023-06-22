@@ -15,6 +15,7 @@ Those drills are run continuously to detect unexpected behaviors over a long per
 - `high_concurrency`: drill that performs high concurrency requests on a collection.
 - `large_retrieve`: drill that retrieves a large number of points on a collection.
 - `collection_concurrent_lifecycle`: drill that performs concurrent collection lifecycle operations.
+- `points_optional_vectors`: drill that creates points with no data at first.
 
 ## usage
 
