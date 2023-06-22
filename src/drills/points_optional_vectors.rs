@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, get_points_count, insert_points_batch, recreate_collection, set_payload,
-    upsert_point_by_id,
+    create_collection, get_points_count, insert_points_batch, recreate_collection,
+    set_indexing_threshold, set_payload, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
@@ -30,7 +30,7 @@ impl PointsOptionalVectors {
         let collection_name = "points-optional-vectors-drill".to_string();
         let vec_dim = 768;
         let payload_count = 2;
-        let points_count = 20000;
+        let points_count = 10000;
         let write_ordering = None; // default
         PointsOptionalVectors {
             collection_name,
@@ -59,6 +59,14 @@ impl Drill for PointsOptionalVectors {
             log::info!("The points optional vectors drill needs to setup the collection first");
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
         }
+
+        // make sure the indexer is triggered
+        set_indexing_threshold(
+            client,
+            &self.collection_name,
+            args.indexing_threshold.unwrap_or(200),
+        )
+        .await?;
 
         // insert some points without data
         insert_points_batch(
