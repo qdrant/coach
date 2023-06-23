@@ -1,6 +1,6 @@
 use crate::args::Args;
 use crate::common::coach_errors::CoachError;
-use crate::drills::collection_churn::CollectionChurn;
+use crate::drills::collection_churn::CollectionsChurn;
 use crate::drills::collection_concurrent_lifecycle::CollectionConcurrentLifecycle;
 use crate::drills::collection_snapshots_churn::CollectionSnapshotsChurn;
 use crate::drills::high_concurrency::HighConcurrency;
@@ -48,7 +48,7 @@ struct DrillReport {
 pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<JoinHandle<()>>> {
     // all drills known to coach
     let all_drills: Vec<Box<dyn Drill>> = vec![
-        Box::new(CollectionChurn::new(stopped.clone())),
+        Box::new(CollectionsChurn::new(stopped.clone())),
         Box::new(PointsSearch::new(stopped.clone())),
         Box::new(PointsChurn::new(stopped.clone())),
         Box::new(PointsUpdate::new(stopped.clone())),

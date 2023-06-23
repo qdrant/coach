@@ -12,26 +12,29 @@ use tokio::time::sleep;
 
 use crate::drill_runner::Drill;
 
-/// Drill that keeps on creating and deleting the same collection
-pub struct CollectionChurn {
-    collection_name: String,
+/// Drill that keeps on creating and deleting the same collections
+pub struct CollectionsChurn {
+    base_collection_name: String,
+    collection_count: usize,
     stopped: Arc<AtomicBool>,
 }
 
-impl CollectionChurn {
+impl CollectionsChurn {
     pub fn new(stopped: Arc<AtomicBool>) -> Self {
-        let collection_name = "collection-churn-drill".to_string();
-        CollectionChurn {
-            collection_name,
+        let base_collection_name = "collection-churn-drill_".to_string();
+        let collection_count = 200;
+        CollectionsChurn {
+            base_collection_name,
+            collection_count,
             stopped,
         }
     }
 }
 
 #[async_trait]
-impl Drill for CollectionChurn {
+impl Drill for CollectionsChurn {
     fn name(&self) -> String {
-        "collection_churn".to_string()
+        "collections_churn".to_string()
     }
 
     fn reschedule_after_sec(&self) -> u64 {
@@ -39,26 +42,39 @@ impl Drill for CollectionChurn {
     }
 
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
-        // delete if already exists
-        if client.has_collection(&self.collection_name).await? {
-            delete_collection(client, &self.collection_name).await?;
-        }
-
-        if self.stopped.load(Ordering::Relaxed) {
-            return Err(Cancelled);
-        }
-
-        sleep(Duration::from_secs(1)).await;
-
-        create_collection(client, &self.collection_name, 128, args.clone()).await?;
-
-        if self.stopped.load(Ordering::Relaxed) {
-            return Err(Cancelled);
+        // cleanup potential left0over previous collections
+        for i in 0..self.collection_count {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
+            let collection_name = format!("{}{}", self.base_collection_name, i);
+            // delete if already exists
+            if client.has_collection(&collection_name).await? {
+                delete_collection(client, &collection_name).await?;
+            }
         }
 
         sleep(Duration::from_secs(1)).await;
 
-        delete_collection(client, &self.collection_name).await?;
+        // create new collections
+        for i in 0..self.collection_count {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
+            let collection_name = format!("{}{}", self.base_collection_name, i);
+            create_collection(client, &collection_name, 128, args.clone()).await?;
+        }
+
+        sleep(Duration::from_secs(1)).await;
+
+        // create new collections
+        for i in 0..self.collection_count {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
+            let collection_name = format!("{}{}", self.base_collection_name, i);
+            delete_collection(client, &collection_name).await?;
+        }
 
         Ok(())
     }
