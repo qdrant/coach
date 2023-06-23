@@ -142,7 +142,7 @@ pub async fn set_payload(
         .await
         .context(format!(
             "Failed to set payload for {} with payload_count {}",
-            collection_name, payload_count
+            point_id, payload_count
         ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
