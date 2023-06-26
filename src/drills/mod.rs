@@ -1,4 +1,4 @@
-pub mod collection_churn;
+pub mod collections_churn;
 pub mod collection_concurrent_lifecycle;
 pub mod collection_snapshots_churn;
 pub mod high_concurrency;

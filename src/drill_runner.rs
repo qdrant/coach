@@ -1,6 +1,6 @@
 use crate::args::Args;
 use crate::common::coach_errors::CoachError;
-use crate::drills::collection_churn::CollectionsChurn;
+use crate::drills::collections_churn::CollectionsChurn;
 use crate::drills::collection_concurrent_lifecycle::CollectionConcurrentLifecycle;
 use crate::drills::collection_snapshots_churn::CollectionSnapshotsChurn;
 use crate::drills::high_concurrency::HighConcurrency;
