@@ -1,5 +1,7 @@
 use crate::args::Args;
-use crate::common::client::{create_collection, delete_collection};
+use crate::common::client::{
+    create_collection, delete_collection, disable_indexing, enable_indexing, insert_points_batch,
+};
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Cancelled;
 use anyhow::Result;
@@ -16,16 +18,22 @@ use crate::drill_runner::Drill;
 pub struct CollectionsChurn {
     base_collection_name: String,
     collection_count: usize,
+    point_count: usize,
+    vec_dim: usize,
     stopped: Arc<AtomicBool>,
 }
 
 impl CollectionsChurn {
     pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let base_collection_name = "collection-churn-drill_".to_string();
-        let collection_count = 200;
+        let collection_count = 100;
+        let point_count = 1000;
+        let vec_dim = 512;
         CollectionsChurn {
             base_collection_name,
             collection_count,
+            point_count,
+            vec_dim,
             stopped,
         }
     }
@@ -62,12 +70,25 @@ impl Drill for CollectionsChurn {
                 return Err(Cancelled);
             }
             let collection_name = format!("{}{}", self.base_collection_name, i);
-            create_collection(client, &collection_name, 128, args.clone()).await?;
+            create_collection(client, &collection_name, self.vec_dim, args.clone()).await?;
+            disable_indexing(client, &collection_name).await?;
+            // insert a few points & trigger indexers
+            insert_points_batch(
+                client,
+                &collection_name,
+                self.point_count,
+                self.vec_dim,
+                0,
+                None,
+                self.stopped.clone(),
+            )
+            .await?;
+            enable_indexing(client, &collection_name).await?;
         }
 
         sleep(Duration::from_secs(1)).await;
 
-        // create new collections
+        // delete new collections
         for i in 0..self.collection_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
