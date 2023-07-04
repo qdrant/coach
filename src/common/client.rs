@@ -12,10 +12,10 @@ use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
     CollectionInfo, CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance,
-    FieldType, GetResponse, OptimizersConfigDiff, PointId, PointStruct, PointsIdsList,
-    PointsSelector, QuantizationConfig, RetrievedPoint, ScalarQuantization, SearchPoints,
-    SearchResponse, VectorParams, VectorParamsMap, VectorsConfig, WithPayloadSelector,
-    WithVectorsSelector, WriteOrdering,
+    FieldType, GetResponse, HnswConfigDiff, OptimizersConfigDiff, PointId, PointStruct,
+    PointsIdsList, PointsSelector, QuantizationConfig, RetrievedPoint, ScalarQuantization,
+    ScrollPoints, ScrollResponse, SearchPoints, SearchResponse, VectorParams, VectorParamsMap,
+    VectorsConfig, WithPayloadSelector, WithVectorsSelector, WriteOrdering,
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -185,6 +185,30 @@ pub async fn search_points(
     Ok(response)
 }
 
+/// Scroll points
+pub async fn scroll_points(
+    client: &QdrantClient,
+    collection_name: &str,
+    payload_count: usize,
+) -> Result<ScrollResponse, anyhow::Error> {
+    let query_filter = random_filter(Some(payload_count));
+
+    let response = client
+        .scroll(&ScrollPoints {
+            collection_name: collection_name.to_string(),
+            filter: query_filter,
+            limit: Some(100),
+            with_payload: Some(true.into()),
+            offset: None,
+            with_vectors: None,
+            read_consistency: None,
+        })
+        .await
+        .context(format!("Failed to scroll points on {}", collection_name))?;
+
+    Ok(response)
+}
+
 /// Retrieve points
 pub async fn retrieve_points(
     client: &QdrantClient,
@@ -309,6 +333,50 @@ pub async fn set_indexing_threshold(
     Ok(())
 }
 
+/// Set mmap threshold
+pub async fn set_mmap_threshold(
+    client: &QdrantClient,
+    collection_name: &str,
+    threshold: usize,
+) -> Result<(), anyhow::Error> {
+    client
+        .update_collection(
+            collection_name,
+            &OptimizersConfigDiff {
+                memmap_threshold: Some(threshold as u64),
+                ..Default::default()
+            },
+        )
+        .await
+        .context(format!(
+            "Failed to set mmap threshold to {} for {}",
+            threshold, collection_name
+        ))?;
+    Ok(())
+}
+
+/// Set max segment size
+pub async fn set_max_segment_size(
+    client: &QdrantClient,
+    collection_name: &str,
+    size: usize,
+) -> Result<(), anyhow::Error> {
+    client
+        .update_collection(
+            collection_name,
+            &OptimizersConfigDiff {
+                max_segment_size: Some(size as u64),
+                ..Default::default()
+            },
+        )
+        .await
+        .context(format!(
+            "Failed to set max segment size to {} for {}",
+            size, collection_name
+        ))?;
+    Ok(())
+}
+
 /// Get collection info
 pub async fn get_collection_info(
     client: &QdrantClient,
@@ -393,7 +461,16 @@ pub async fn create_collection(
                             VectorParams {
                                 size: vec_dim as u64,
                                 distance: Distance::Cosine.into(),
-                                hnsw_config: None,
+                                hnsw_config: Some(HnswConfigDiff {
+                                    m: None,
+                                    ef_construct: None,
+                                    full_scan_threshold: None,
+                                    max_indexing_threads: args
+                                        .max_indexing_threads
+                                        .map(|i| i as u64),
+                                    on_disk: Some(args.hnsw_on_disk),
+                                    payload_m: None,
+                                }),
                                 quantization_config: if args.use_scalar_quantization {
                                     Some(QuantizationConfig {
                                         quantization: Some(Quantization::Scalar(
@@ -431,6 +508,7 @@ pub async fn create_collection(
                 Some(args.shard_number as u32)
             },
             write_consistency_factor: Some(args.write_consistency_factor as u32),
+            on_disk_payload: Some(args.payload_on_disk),
             optimizers_config: Some(OptimizersConfigDiff {
                 indexing_threshold: args.indexing_threshold.map(|i| i as u64),
                 memmap_threshold: args.memmap_threshold.map(|i| i as u64),
@@ -590,6 +668,7 @@ pub async fn count_collection_snapshots(
     Ok(snapshots.len())
 }
 
+/// Create field index
 pub async fn create_field_index(
     client: &QdrantClient,
     collection_name: &str,

@@ -32,8 +32,17 @@ pub struct Args {
     #[arg(long, default_value_t = false)]
     pub use_scalar_quantization: bool,
     /// If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM.
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = true)]
     pub vectors_on_disk: bool,
+    /// If true - point's payload will not be stored in memory
+    #[arg(long, default_value_t = true)]
+    pub payload_on_disk: bool,
+    /// If set to false, the index will be stored in RAM.
+    #[arg(long, default_value_t = true)]
+    pub hnsw_on_disk: bool,
+    /// Number of parallel threads used for background index building.
+    #[arg(long)]
+    pub max_indexing_threads: Option<usize>,
     /// Stop all drills at the first error encountered
     #[arg(long, default_value_t = false)]
     pub stop_at_first_error: bool,
