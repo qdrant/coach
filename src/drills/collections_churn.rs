@@ -1,6 +1,6 @@
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_collection, disable_indexing, enable_indexing, insert_points_batch,
+    create_collection, delete_collection, enable_indexing, insert_points_batch,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Cancelled;
@@ -27,7 +27,7 @@ impl CollectionsChurn {
     pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let base_collection_name = "collection-churn-drill_".to_string();
         let collection_count = 100;
-        let point_count = 1000;
+        let point_count = 10000;
         let vec_dim = 512;
         CollectionsChurn {
             base_collection_name,
@@ -50,7 +50,7 @@ impl Drill for CollectionsChurn {
     }
 
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
-        // cleanup potential left0over previous collections
+        // cleanup potential left-over previous collections
         for i in 0..self.collection_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
@@ -71,22 +71,19 @@ impl Drill for CollectionsChurn {
             }
             let collection_name = format!("{}{}", self.base_collection_name, i);
             create_collection(client, &collection_name, self.vec_dim, args.clone()).await?;
-            disable_indexing(client, &collection_name).await?;
+            enable_indexing(client, &collection_name).await?;
             // insert a few points & trigger indexers
             insert_points_batch(
                 client,
                 &collection_name,
                 self.point_count,
                 self.vec_dim,
-                0,
+                2,
                 None,
                 self.stopped.clone(),
             )
             .await?;
-            enable_indexing(client, &collection_name).await?;
         }
-
-        sleep(Duration::from_secs(1)).await;
 
         // delete new collections
         for i in 0..self.collection_count {
