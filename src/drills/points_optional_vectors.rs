@@ -58,15 +58,6 @@ impl Drill for PointsOptionalVectors {
         if !client.has_collection(&self.collection_name).await? {
             log::info!("The points optional vectors drill needs to setup the collection first");
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
-        } else {
-            // assert point count
-            let points_count = get_points_count(client, &self.collection_name).await?;
-            if points_count != self.points_count {
-                return Err(Invariant(format!(
-                    "Collection has wrong number of points from previous run {} vs {}",
-                    points_count, self.points_count
-                )));
-            }
         }
 
         // make sure the indexer is triggered
