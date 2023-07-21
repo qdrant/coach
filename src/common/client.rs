@@ -560,15 +560,31 @@ pub async fn insert_points_batch(
     write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
 ) -> Result<(), CoachError> {
-    let batch_size = 100;
-    let num_batches = points_count / batch_size;
-
+    let cut_off_size = 100;
+    // handle less than batch & spill over
+    let (batch_size, num_batches, last_batch_size) = if points_count <= cut_off_size {
+        (points_count, 1, points_count)
+    } else {
+        let remainder = points_count % cut_off_size;
+        let div = points_count / cut_off_size;
+        let num_batches = div + if remainder > 0 { 1 } else { 0 };
+        let last_batch_size = if remainder > 0 {
+            remainder
+        } else {
+            cut_off_size
+        };
+        (cut_off_size, num_batches, last_batch_size)
+    };
     for batch_id in 0..num_batches {
+        let batch_size = if batch_id == num_batches - 1 {
+            last_batch_size
+        } else {
+            batch_size
+        };
         let mut points = Vec::with_capacity(batch_size);
-        let batch_base_id = batch_id as u64 * batch_size as u64;
+        let batch_base_id = batch_id as u64 * cut_off_size as u64;
         for i in 0..batch_size {
             let idx = batch_base_id + i as u64;
-
             let point_id: PointId = PointId {
                 point_id_options: Some(PointIdOptions::Num(idx)),
             };
