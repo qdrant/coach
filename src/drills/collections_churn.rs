@@ -26,7 +26,7 @@ pub struct CollectionsChurn {
 impl CollectionsChurn {
     pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let base_collection_name = "collection-churn-drill_".to_string();
-        let collection_count = 100;
+        let collection_count = 10;
         let point_count = 10000;
         let vec_dim = 512;
         CollectionsChurn {
