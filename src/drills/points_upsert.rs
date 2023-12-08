@@ -76,11 +76,11 @@ impl Drill for PointsUpdate {
             .await?
             .result
             .unwrap();
-
-        if collection_info.points_count != self.points_count as u64 {
+        let points_count = collection_info.points_count.unwrap_or_default();
+        if points_count != self.points_count as u64 {
             return Err(Invariant(format!(
                 "Collection has wrong number of points after insert {} vs {}",
-                collection_info.points_count, self.points_count
+                points_count, self.points_count
             )));
         }
 

@@ -36,6 +36,7 @@ pub async fn get_point_by_id(
     let point = client
         .get_points(
             collection_name,
+            None,
             &[point_id_grpc],
             with_vectors,
             with_payload,
@@ -70,7 +71,7 @@ pub async fn upsert_point_by_id(
 
     let points = vec![point_struct];
     client
-        .upsert_points_blocking(collection_name, points, write_ordering)
+        .upsert_points_blocking(collection_name, None, points, write_ordering)
         .await
         .context(format!(
             "Failed to update point_id:{} in {}",
@@ -94,6 +95,7 @@ pub async fn delete_point_by_id(
     let resp = client
         .delete_points_blocking(
             collection_name,
+            None,
             &PointsSelector {
                 points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
                     ids: points_selector,
@@ -138,7 +140,13 @@ pub async fn set_payload(
     };
 
     let resp = client
-        .set_payload_blocking(collection_name, points_selector, payload, write_ordering)
+        .set_payload_blocking(
+            collection_name,
+            None,
+            points_selector,
+            payload,
+            write_ordering,
+        )
         .await
         .context(format!(
             "Failed to set payload for {} with payload_count {}",
@@ -178,6 +186,9 @@ pub async fn search_points(
             vector_name: Some(DEFAULT_VECTOR_NAME.to_string()),
             with_vectors: None,
             read_consistency: None,
+            shard_key_selector: None,
+            timeout: None,
+            sparse_indices: None,
         })
         .await
         .context(format!("Failed to search points on {}", collection_name))?;
@@ -202,6 +213,7 @@ pub async fn scroll_points(
             offset: None,
             with_vectors: None,
             read_consistency: None,
+            shard_key_selector: None,
         })
         .await
         .context(format!("Failed to scroll points on {}", collection_name))?;
@@ -221,6 +233,7 @@ pub async fn retrieve_points(
     let response = client
         .get_points(
             collection_name,
+            None,
             ids.iter()
                 .map(|id| (*id as u64).into())
                 .collect::<Vec<_>>()
@@ -250,7 +263,7 @@ pub async fn get_points_count(
         .result
         .unwrap()
         .points_count;
-    Ok(point_count as usize)
+    Ok(point_count.unwrap_or_default() as usize)
 }
 
 /// delete points (blocking)
@@ -269,6 +282,7 @@ pub async fn delete_points(
     let resp = client
         .delete_points_blocking(
             collection_name,
+            None,
             &PointsSelector {
                 points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
                     ids: points_selector,
@@ -320,10 +334,15 @@ pub async fn set_indexing_threshold(
     client
         .update_collection(
             collection_name,
-            &OptimizersConfigDiff {
+            Some(&OptimizersConfigDiff {
                 indexing_threshold: Some(threshold as u64),
                 ..Default::default()
-            },
+            }),
+            None,
+            None,
+            None,
+            None,
+            None,
         )
         .await
         .context(format!(
@@ -342,10 +361,15 @@ pub async fn set_mmap_threshold(
     client
         .update_collection(
             collection_name,
-            &OptimizersConfigDiff {
+            Some(&OptimizersConfigDiff {
                 memmap_threshold: Some(threshold as u64),
                 ..Default::default()
-            },
+            }),
+            None,
+            None,
+            None,
+            None,
+            None,
         )
         .await
         .context(format!(
@@ -364,10 +388,15 @@ pub async fn set_max_segment_size(
     client
         .update_collection(
             collection_name,
-            &OptimizersConfigDiff {
+            Some(&OptimizersConfigDiff {
                 max_segment_size: Some(size as u64),
                 ..Default::default()
-            },
+            }),
+            None,
+            None,
+            None,
+            None,
+            None,
         )
         .await
         .context(format!(
@@ -606,7 +635,7 @@ pub async fn insert_points_batch(
 
         // push batch blocking
         let resp = client
-            .upsert_points_blocking(collection_name, points, write_ordering.clone())
+            .upsert_points_blocking(collection_name, None, points, write_ordering.clone())
             .await
             .context(format!(
                 "Failed to insert {} points (batch {}/{}) into {}",
