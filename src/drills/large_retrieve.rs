@@ -52,7 +52,7 @@ impl Drill for LargeRetrieve {
     }
 
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
-        // create and populate collection if it does not exists
+        // create and populate collection if it does not exist
         if !client.has_collection(&self.collection_name).await? {
             log::info!("The large retrieve drill needs to setup the collection first");
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;

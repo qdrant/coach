@@ -105,7 +105,7 @@ impl HighConcurrency {
         Ok(())
     }
 
-    fn pick_random<'a>(&self, clients: &'a Vec<QdrantClient>) -> &'a QdrantClient {
+    fn pick_random<'a>(&self, clients: &'a [QdrantClient]) -> &'a QdrantClient {
         let index = rand::random::<usize>() % clients.len();
         &clients[index]
     }
