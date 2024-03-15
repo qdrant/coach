@@ -145,6 +145,7 @@ pub async fn set_payload(
             None,
             points_selector,
             payload,
+            None,
             write_ordering,
         )
         .await
@@ -214,6 +215,7 @@ pub async fn scroll_points(
             with_vectors: None,
             read_consistency: None,
             shard_key_selector: None,
+            order_by: None,
         })
         .await
         .context(format!("Failed to scroll points on {}", collection_name))?;
@@ -569,7 +571,7 @@ pub async fn recreate_collection(
     vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
-    if client.has_collection(&collection_name).await? {
+    if client.collection_exists(&collection_name).await? {
         log::info!("recreating existing collection {}", collection_name);
         delete_collection(client, collection_name).await?;
         sleep(Duration::from_secs(2)).await;

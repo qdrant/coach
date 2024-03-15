@@ -55,7 +55,7 @@ impl Drill for ToggleIndexing {
 
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // delete if already exists
-        if client.has_collection(&self.collection_name).await? {
+        if client.collection_exists(&self.collection_name).await? {
             delete_collection(client, &self.collection_name).await?;
         }
 

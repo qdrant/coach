@@ -52,7 +52,7 @@ impl Drill for CollectionSnapshotsChurn {
 
     async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
         // create and populate collection if it does not exist
-        if !client.has_collection(&self.collection_name).await? {
+        if !client.collection_exists(&self.collection_name).await? {
             // create collection
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
 

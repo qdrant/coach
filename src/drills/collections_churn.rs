@@ -57,7 +57,7 @@ impl Drill for CollectionsChurn {
             }
             let collection_name = format!("{}{}", self.base_collection_name, i);
             // delete if already exists
-            if client.has_collection(&collection_name).await? {
+            if client.collection_exists(&collection_name).await? {
                 delete_collection(client, &collection_name).await?;
             }
         }
