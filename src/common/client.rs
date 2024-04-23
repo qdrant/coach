@@ -431,7 +431,7 @@ pub async fn get_collection_status(
 ) -> Result<CollectionStatus, anyhow::Error> {
     let info = get_collection_info(client, collection_name).await;
     match info {
-        Ok(Some(info)) => Ok(CollectionStatus::from_i32(info.status).unwrap()),
+        Ok(Some(info)) => Ok(CollectionStatus::try_from(info.status).unwrap()),
         Ok(None) => Err(anyhow::anyhow!(
             "Failed to get non-empty collection status for {}",
             collection_name
@@ -516,6 +516,7 @@ pub async fn create_collection(
                                     None
                                 },
                                 on_disk: Some(args.vectors_on_disk),
+                                datatype: None,
                             },
                         ),
                         (
