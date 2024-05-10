@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.82"
-thiserror = "1.0.59"
+thiserror = "1.0.60"
 clap = { version = "4.5.4", features = ["derive"] }
 ctrlc = "3.4.4"
 futures = "0.3.30"
