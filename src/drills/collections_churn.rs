@@ -1,18 +1,20 @@
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_collection, enable_indexing, insert_points_batch,
+    create_collection, create_field_index, delete_collection, enable_indexing, get_collection_info,
+    insert_points_batch,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Cancelled;
+use crate::common::generators::KEYWORD_PAYLOAD_KEY;
+use crate::drill_runner::Drill;
 use anyhow::Result;
 use async_trait::async_trait;
 use qdrant_client::client::QdrantClient;
+use qdrant_client::qdrant::FieldType;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-
-use crate::drill_runner::Drill;
 
 /// Drill that keeps on creating and deleting the same collections
 pub struct CollectionsChurn {
@@ -83,6 +85,21 @@ impl Drill for CollectionsChurn {
                 self.stopped.clone(),
             )
             .await?;
+            // create field index (non-blocking)
+            create_field_index(
+                client,
+                &collection_name,
+                KEYWORD_PAYLOAD_KEY,
+                FieldType::Keyword,
+            )
+            .await?;
+            let info = get_collection_info(client, &collection_name).await?;
+            if info.is_none() {
+                return Err(CoachError::Invariant(format!(
+                    "Collection info for {} was not found after it was created",
+                    collection_name
+                )));
+            }
         }
 
         // delete new collections

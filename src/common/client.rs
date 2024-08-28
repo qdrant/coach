@@ -716,6 +716,29 @@ pub async fn count_collection_snapshots(
     Ok(snapshots.len())
 }
 
+/// Create field index (blocking)
+pub async fn create_field_index_blocking(
+    client: &QdrantClient,
+    collection_name: &str,
+    field_name: &str,
+    field_type: FieldType,
+) -> Result<(), anyhow::Error> {
+    client
+        .create_field_index_blocking(
+            collection_name.to_string(),
+            field_name.to_string(),
+            field_type,
+            None,
+            None,
+        )
+        .await
+        .context(format!(
+            "Failed to create field index {} for collection {}",
+            field_name, collection_name
+        ))?;
+    Ok(())
+}
+
 /// Create field index
 pub async fn create_field_index(
     client: &QdrantClient,
@@ -724,7 +747,7 @@ pub async fn create_field_index(
     field_type: FieldType,
 ) -> Result<(), anyhow::Error> {
     client
-        .create_field_index_blocking(
+        .create_field_index(
             collection_name.to_string(),
             field_name.to_string(),
             field_type,
