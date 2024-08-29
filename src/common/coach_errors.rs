@@ -17,3 +17,9 @@ impl From<anyhow::Error> for CoachError {
         CoachError::Client(e)
     }
 }
+
+impl From<qdrant_client::QdrantError> for CoachError {
+    fn from(e: qdrant_client::QdrantError) -> Self {
+        Self::Client(e.into())
+    }
+}

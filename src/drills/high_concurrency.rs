@@ -1,5 +1,4 @@
 use anyhow::Result;
-use qdrant_client::client::QdrantClient;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -15,6 +14,7 @@ use crate::get_config;
 use async_trait::async_trait;
 use futures::StreamExt;
 use qdrant_client::qdrant::WriteOrdering;
+use qdrant_client::Qdrant;
 
 /// Drill that performs operations on a collection with a high level of concurrency (without indexing).
 /// Run `concurrency_level` workers which repeatedly call APIs for inserting -> searching -> set payload -> updating -> getting one -> deleting
@@ -48,7 +48,7 @@ impl HighConcurrency {
         }
     }
 
-    async fn run_for_point(&self, client: &QdrantClient, point_id: u64) -> Result<(), CoachError> {
+    async fn run_for_point(&self, client: &Qdrant, point_id: u64) -> Result<(), CoachError> {
         // insert single point
         upsert_point_by_id(
             client,
@@ -56,7 +56,7 @@ impl HighConcurrency {
             point_id,
             self.vec_dim,
             self.payload_count,
-            self.write_ordering.clone(),
+            self.write_ordering,
         )
         .await?;
 
@@ -75,7 +75,7 @@ impl HighConcurrency {
             &self.collection_name,
             point_id,
             self.payload_count,
-            self.write_ordering.clone(),
+            self.write_ordering,
         )
         .await?;
 
@@ -86,7 +86,7 @@ impl HighConcurrency {
             point_id,
             self.vec_dim,
             self.payload_count,
-            self.write_ordering.clone(),
+            self.write_ordering,
         )
         .await?;
 
@@ -105,7 +105,7 @@ impl HighConcurrency {
         Ok(())
     }
 
-    fn pick_random<'a>(&self, clients: &'a [QdrantClient]) -> &'a QdrantClient {
+    fn pick_random<'a>(&self, clients: &'a [Qdrant]) -> &'a Qdrant {
         let index = rand::random::<usize>() % clients.len();
         &clients[index]
     }
@@ -121,7 +121,7 @@ impl Drill for HighConcurrency {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // delete if already exists
         if client.collection_exists(&self.collection_name).await? {
             delete_collection(client, &self.collection_name).await?;
@@ -133,7 +133,7 @@ impl Drill for HighConcurrency {
         // workers will target random clients for all nodes to stress the cluster
         let mut target_clients = vec![];
         for uri in &args.uris {
-            let target_client = QdrantClient::new(Some(get_config(uri, args.grpc_timeout_ms)))?;
+            let target_client = Qdrant::new(get_config(uri, args.grpc_timeout_ms))?;
             target_clients.push(target_client);
         }
 
@@ -161,7 +161,7 @@ impl Drill for HighConcurrency {
         Ok(())
     }
 
-    async fn before_all(&self, _client: &QdrantClient, _args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(&self, _client: &Qdrant, _args: Arc<Args>) -> Result<(), CoachError> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())

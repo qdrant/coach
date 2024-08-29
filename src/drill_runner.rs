@@ -17,7 +17,7 @@ use log::debug;
 use log::error;
 use log::info;
 use log::warn;
-use qdrant_client::client::QdrantClient;
+use qdrant_client::Qdrant;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -34,9 +34,9 @@ pub trait Drill: Send + Sync {
     // delay between runs
     fn reschedule_after_sec(&self) -> u64;
     // run drill
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError>;
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError>;
     // run before the first run
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError>;
+    async fn before_all(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError>;
 }
 
 struct DrillReport {
@@ -73,7 +73,10 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
             .collect::<Vec<_>>()
     };
 
-    let mut drill_tasks = vec![];
+    if drills_to_run.is_empty() {
+        error!("No drills to run - make sure the drill names are correct");
+        return Err(anyhow::anyhow!("No drills to run"));
+    }
 
     info!(
         "Coach is scheduling {} drills against {:?} (by batch of {}):",
@@ -93,10 +96,11 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     let uris_len = args.uris.len();
     let args_arc = Arc::new(args);
     let first_uri = &args_arc.uris.first().expect("Not empty per construction");
-    let before_client = QdrantClient::new(Some(get_config(first_uri, args_arc.grpc_timeout_ms)))?;
+    let before_client = Qdrant::new(get_config(first_uri, args_arc.grpc_timeout_ms))?;
     // pick first uri to run before_all
     let before_client_arc = Arc::new(before_client);
     // run drills
+    let mut drill_tasks = Vec::with_capacity(drills_to_run.len());
     for drill in drills_to_run {
         let stopped = stopped.clone();
         let drill_semaphore = max_drill_semaphore.clone();
@@ -136,7 +140,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                         return;
                     }
                     let drill_client =
-                        QdrantClient::new(Some(get_config(uri, args_arc.grpc_timeout_ms))).unwrap();
+                        Qdrant::new(get_config(uri, args_arc.grpc_timeout_ms)).unwrap();
                     let execution_start = Instant::now();
                     let result = drill.run(&drill_client, args_arc.clone()).await;
                     match result {

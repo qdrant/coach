@@ -1,5 +1,4 @@
 use anyhow::Result;
-use qdrant_client::client::QdrantClient;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -11,6 +10,7 @@ use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
+use qdrant_client::Qdrant;
 
 /// Drill that performs large retrieve requests on a collection.
 /// The collection is created and populated with random data if it does not exist.
@@ -51,7 +51,7 @@ impl Drill for LargeRetrieve {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
             log::info!("The large retrieve drill needs to setup the collection first");
@@ -100,7 +100,7 @@ impl Drill for LargeRetrieve {
         Ok(())
     }
 
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;

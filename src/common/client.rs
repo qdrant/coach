@@ -5,18 +5,18 @@ use crate::common::generators::{
     random_filter, random_named_vector, random_payload, random_vector,
 };
 use anyhow::Context;
-use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
-use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CollectionInfo, CollectionStatus, CreateCollection, CreateSnapshotResponse, Distance,
-    FieldType, GetResponse, HnswConfigDiff, OptimizersConfigDiff, PointId, PointStruct,
-    PointsIdsList, PointsSelector, QuantizationConfig, RetrievedPoint, ScalarQuantization,
-    ScrollPoints, ScrollResponse, SearchPoints, SearchResponse, VectorParams, VectorParamsMap,
-    VectorsConfig, WithPayloadSelector, WithVectorsSelector, WriteOrdering,
+    CollectionInfo, CollectionStatus, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder,
+    CreateSnapshotResponse, DeletePointsBuilder, DeleteSnapshotRequestBuilder, Distance, FieldType,
+    GetPointsBuilder, GetResponse, HnswConfigDiff, OptimizersConfigDiff, PointId, PointStruct,
+    QuantizationConfig, RetrievedPoint, ScalarQuantization, ScrollPointsBuilder, ScrollResponse,
+    SearchPointsBuilder, SearchResponse, SetPayloadPointsBuilder, UpdateCollectionBuilder,
+    UpsertPointsBuilder, VectorParams, VectorParamsMap, VectorsConfig, WriteOrdering,
 };
+use qdrant_client::Qdrant;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -25,23 +25,13 @@ use tokio::time::sleep;
 
 /// Get point by id
 pub async fn get_point_by_id(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     point_id: u64,
 ) -> Result<Option<RetrievedPoint>, anyhow::Error> {
     let point_id_grpc = point_id.into();
-    // type inference issues forces to ascribe the types :shrug:
-    let with_vectors: Option<WithVectorsSelector> = None;
-    let with_payload: Option<WithPayloadSelector> = None;
     let point = client
-        .get_points(
-            collection_name,
-            None,
-            &[point_id_grpc],
-            with_vectors,
-            with_payload,
-            None,
-        )
+        .get_points(GetPointsBuilder::new(collection_name, &[point_id_grpc]))
         .await
         .context(format!(
             "Failed to get point by id {} from {}",
@@ -52,7 +42,7 @@ pub async fn get_point_by_id(
 
 /// upsert single point into collection (blocking)
 pub async fn upsert_point_by_id(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     point_id: u64,
     vec_dim: usize,
@@ -70,20 +60,21 @@ pub async fn upsert_point_by_id(
     );
 
     let points = vec![point_struct];
-    client
-        .upsert_points_blocking(collection_name, None, points, write_ordering)
-        .await
-        .context(format!(
-            "Failed to update point_id:{} in {}",
-            point_id, collection_name
-        ))?;
+    let mut builder = UpsertPointsBuilder::new(collection_name, points).wait(true);
+    if let Some(write_ordering) = write_ordering {
+        builder = builder.ordering(write_ordering);
+    }
+    client.upsert_points(builder).await.context(format!(
+        "Failed to update point_id:{} in {}",
+        point_id, collection_name
+    ))?;
 
     Ok(())
 }
 
 /// delete points (blocking)
 pub async fn delete_point_by_id(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     point_id: u64,
 ) -> Result<(), anyhow::Error> {
@@ -93,15 +84,10 @@ pub async fn delete_point_by_id(
 
     // delete point
     let resp = client
-        .delete_points_blocking(
-            collection_name,
-            None,
-            &PointsSelector {
-                points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
-                    ids: points_selector,
-                })),
-            },
-            None,
+        .delete_points(
+            DeletePointsBuilder::new(collection_name)
+                .points(points_selector)
+                .wait(true),
         )
         .await
         .context(format!(
@@ -121,7 +107,7 @@ pub async fn delete_point_by_id(
 
 /// Set payload (blocking)
 pub async fn set_payload(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     point_id: u64,
     payload_count: usize,
@@ -133,26 +119,18 @@ pub async fn set_payload(
         point_id_options: Some(PointIdOptions::Num(point_id)),
     }];
 
-    let points_selector = &PointsSelector {
-        points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
-            ids: points_id_selector,
-        })),
-    };
+    let mut builder = SetPayloadPointsBuilder::new(collection_name, payload)
+        .points_selector(points_id_selector)
+        .wait(true);
 
-    let resp = client
-        .set_payload_blocking(
-            collection_name,
-            None,
-            points_selector,
-            payload,
-            None,
-            write_ordering,
-        )
-        .await
-        .context(format!(
-            "Failed to set payload for {} with payload_count {}",
-            point_id, payload_count
-        ))?;
+    if let Some(write_ordering) = write_ordering {
+        builder = builder.ordering(write_ordering);
+    }
+
+    let resp = client.set_payload(builder).await.context(format!(
+        "Failed to set payload for {} with payload_count {}",
+        point_id, payload_count
+    ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
             "Failed to set payload on point_id {} for {}",
@@ -166,7 +144,7 @@ pub async fn set_payload(
 
 /// Search points
 pub async fn search_points(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     vec_dim: usize,
     payload_count: usize,
@@ -174,23 +152,16 @@ pub async fn search_points(
     let query_vector = random_vector(vec_dim);
     let query_filter = random_filter(Some(payload_count));
 
+    let mut builder = SearchPointsBuilder::new(collection_name, query_vector, 100)
+        .vector_name(DEFAULT_VECTOR_NAME.to_string())
+        .with_payload(true);
+
+    if let Some(query_filter) = query_filter {
+        builder = builder.filter(query_filter);
+    }
+
     let response = client
-        .search_points(&SearchPoints {
-            collection_name: collection_name.to_string(),
-            vector: query_vector,
-            filter: query_filter,
-            limit: 100,
-            with_payload: Some(true.into()),
-            params: None,
-            score_threshold: None,
-            offset: None,
-            vector_name: Some(DEFAULT_VECTOR_NAME.to_string()),
-            with_vectors: None,
-            read_consistency: None,
-            shard_key_selector: None,
-            timeout: None,
-            sparse_indices: None,
-        })
+        .search_points(builder)
         .await
         .context(format!("Failed to search points on {}", collection_name))?;
 
@@ -198,25 +169,24 @@ pub async fn search_points(
 }
 
 /// Scroll points
+#[allow(unused)]
 pub async fn scroll_points(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     payload_count: usize,
 ) -> Result<ScrollResponse, anyhow::Error> {
     let query_filter = random_filter(Some(payload_count));
 
+    let mut builder = ScrollPointsBuilder::new(collection_name)
+        .limit(100)
+        .with_payload(true);
+
+    if let Some(query_filter) = query_filter {
+        builder = builder.filter(query_filter);
+    }
+
     let response = client
-        .scroll(&ScrollPoints {
-            collection_name: collection_name.to_string(),
-            filter: query_filter,
-            limit: Some(100),
-            with_payload: Some(true.into()),
-            offset: None,
-            with_vectors: None,
-            read_consistency: None,
-            shard_key_selector: None,
-            order_by: None,
-        })
+        .scroll(builder)
         .await
         .context(format!("Failed to scroll points on {}", collection_name))?;
 
@@ -225,25 +195,13 @@ pub async fn scroll_points(
 
 /// Retrieve points
 pub async fn retrieve_points(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     ids: &[usize],
 ) -> Result<GetResponse, anyhow::Error> {
-    // type inference issues forces to ascribe the types :shrug:
-    let with_vectors: Option<WithVectorsSelector> = Some(true.into());
-    let with_payload: Option<WithPayloadSelector> = None;
+    let ids = ids.iter().map(|id| (*id as u64).into()).collect::<Vec<_>>();
     let response = client
-        .get_points(
-            collection_name,
-            None,
-            ids.iter()
-                .map(|id| (*id as u64).into())
-                .collect::<Vec<_>>()
-                .as_slice(),
-            with_vectors,
-            with_payload,
-            None,
-        )
+        .get_points(GetPointsBuilder::new(collection_name, ids).with_vectors(true))
         .await
         .context(format!("Failed to retrieve points on {}", collection_name))?;
 
@@ -252,7 +210,7 @@ pub async fn retrieve_points(
 
 /// Get points count
 pub async fn get_points_count(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<usize, anyhow::Error> {
     let point_count = client
@@ -270,11 +228,11 @@ pub async fn get_points_count(
 
 /// delete points (blocking)
 pub async fn delete_points(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     points_count: usize,
 ) -> Result<(), anyhow::Error> {
-    let points_selector = (0..points_count as u64)
+    let points_selector: Vec<_> = (0..points_count as u64)
         .map(|id| PointId {
             point_id_options: Some(PointIdOptions::Num(id)),
         })
@@ -282,15 +240,10 @@ pub async fn delete_points(
 
     // delete all points
     let resp = client
-        .delete_points_blocking(
-            collection_name,
-            None,
-            &PointsSelector {
-                points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
-                    ids: points_selector,
-                })),
-            },
-            None,
+        .delete_points(
+            DeletePointsBuilder::new(collection_name)
+                .points(points_selector)
+                .wait(true),
         )
         .await
         .context(format!(
@@ -309,19 +262,13 @@ pub async fn delete_points(
 }
 
 ///Disable indexing
-pub async fn disable_indexing(
-    client: &QdrantClient,
-    collection_name: &str,
-) -> Result<(), anyhow::Error> {
+pub async fn disable_indexing(client: &Qdrant, collection_name: &str) -> Result<(), anyhow::Error> {
     set_indexing_threshold(client, collection_name, usize::MAX).await?;
     Ok(())
 }
 
 /// Enable indexing
-pub async fn enable_indexing(
-    client: &QdrantClient,
-    collection_name: &str,
-) -> Result<(), anyhow::Error> {
+pub async fn enable_indexing(client: &Qdrant, collection_name: &str) -> Result<(), anyhow::Error> {
     // 1000 is the min possible value
     set_indexing_threshold(client, collection_name, 1000).await?;
     Ok(())
@@ -329,22 +276,16 @@ pub async fn enable_indexing(
 
 /// Set indexing threshold
 pub async fn set_indexing_threshold(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     threshold: usize,
 ) -> Result<(), anyhow::Error> {
     client
         .update_collection(
-            collection_name,
-            Some(&OptimizersConfigDiff {
+            UpdateCollectionBuilder::new(collection_name).optimizers_config(OptimizersConfigDiff {
                 indexing_threshold: Some(threshold as u64),
                 ..Default::default()
             }),
-            None,
-            None,
-            None,
-            None,
-            None,
         )
         .await
         .context(format!(
@@ -355,23 +296,18 @@ pub async fn set_indexing_threshold(
 }
 
 /// Set mmap threshold
+#[allow(unused)]
 pub async fn set_mmap_threshold(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     threshold: usize,
 ) -> Result<(), anyhow::Error> {
     client
         .update_collection(
-            collection_name,
-            Some(&OptimizersConfigDiff {
+            UpdateCollectionBuilder::new(collection_name).optimizers_config(OptimizersConfigDiff {
                 memmap_threshold: Some(threshold as u64),
                 ..Default::default()
             }),
-            None,
-            None,
-            None,
-            None,
-            None,
         )
         .await
         .context(format!(
@@ -382,23 +318,18 @@ pub async fn set_mmap_threshold(
 }
 
 /// Set max segment size
+#[allow(unused)]
 pub async fn set_max_segment_size(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     size: usize,
 ) -> Result<(), anyhow::Error> {
     client
         .update_collection(
-            collection_name,
-            Some(&OptimizersConfigDiff {
+            UpdateCollectionBuilder::new(collection_name).optimizers_config(OptimizersConfigDiff {
                 max_segment_size: Some(size as u64),
                 ..Default::default()
             }),
-            None,
-            None,
-            None,
-            None,
-            None,
         )
         .await
         .context(format!(
@@ -410,7 +341,7 @@ pub async fn set_max_segment_size(
 
 /// Get collection info
 pub async fn get_collection_info(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<Option<CollectionInfo>, anyhow::Error> {
     let collection_info = client
@@ -426,12 +357,12 @@ pub async fn get_collection_info(
 
 /// Get collection status
 pub async fn get_collection_status(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<CollectionStatus, anyhow::Error> {
     let info = get_collection_info(client, collection_name).await;
     match info {
-        Ok(Some(info)) => Ok(CollectionStatus::try_from(info.status).unwrap()),
+        Ok(Some(info)) => Ok(CollectionStatus::try_from(info.status)?),
         Ok(None) => Err(anyhow::anyhow!(
             "Failed to get non-empty collection status for {}",
             collection_name
@@ -446,7 +377,7 @@ pub async fn get_collection_status(
 
 /// Wait for collection to be indexed
 pub async fn wait_index(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     stopped: Arc<AtomicBool>,
 ) -> Result<f64, CoachError> {
@@ -476,78 +407,73 @@ const UNUSED_VECTOR_NAME: &str = "unused_coach_vector";
 
 /// Create collection
 pub async fn create_collection(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
-    client
-        .create_collection(&CreateCollection {
-            collection_name: collection_name.to_string(),
-            vectors_config: Some(VectorsConfig {
-                config: Some(Config::ParamsMap(VectorParamsMap {
-                    map: vec![
-                        (
-                            DEFAULT_VECTOR_NAME.to_string(),
-                            VectorParams {
-                                size: vec_dim as u64,
-                                distance: Distance::Cosine.into(),
-                                hnsw_config: Some(HnswConfigDiff {
-                                    m: None,
-                                    ef_construct: None,
-                                    full_scan_threshold: None,
-                                    max_indexing_threads: args
-                                        .max_indexing_threads
-                                        .map(|i| i as u64),
-                                    on_disk: Some(args.hnsw_on_disk),
-                                    payload_m: None,
-                                }),
-                                quantization_config: if args.use_scalar_quantization {
-                                    Some(QuantizationConfig {
-                                        quantization: Some(Quantization::Scalar(
-                                            ScalarQuantization {
-                                                r#type: 1, //Int8
-                                                quantile: None,
-                                                always_ram: Some(true),
-                                            },
-                                        )),
-                                    })
-                                } else {
-                                    None
-                                },
-                                on_disk: Some(args.vectors_on_disk),
-                                datatype: None,
+    let mut builder = CreateCollectionBuilder::new(collection_name)
+        .vectors_config(VectorsConfig {
+            config: Some(Config::ParamsMap(VectorParamsMap {
+                map: vec![
+                    (
+                        DEFAULT_VECTOR_NAME.to_string(),
+                        VectorParams {
+                            size: vec_dim as u64,
+                            distance: Distance::Cosine.into(),
+                            hnsw_config: Some(HnswConfigDiff {
+                                m: None,
+                                ef_construct: None,
+                                full_scan_threshold: None,
+                                max_indexing_threads: args.max_indexing_threads.map(|i| i as u64),
+                                on_disk: Some(args.hnsw_on_disk),
+                                payload_m: None,
+                            }),
+                            quantization_config: if args.use_scalar_quantization {
+                                Some(QuantizationConfig {
+                                    quantization: Some(Quantization::Scalar(ScalarQuantization {
+                                        r#type: 1, //Int8
+                                        quantile: None,
+                                        always_ram: Some(true),
+                                    })),
+                                })
+                            } else {
+                                None
                             },
-                        ),
-                        (
-                            UNUSED_VECTOR_NAME.to_string(), // unused vector to generate more complex config
-                            VectorParams {
-                                size: vec_dim as u64,
-                                distance: Distance::Cosine.into(),
-                                on_disk: Some(args.vectors_on_disk),
-                                ..Default::default()
-                            },
-                        ),
-                    ]
-                    .into_iter()
-                    .collect::<HashMap<_, _>>(),
-                })),
-            }),
-            replication_factor: Some(args.replication_factor as u32),
-            shard_number: if args.shard_number == 0 {
-                None
-            } else {
-                Some(args.shard_number as u32)
-            },
-            write_consistency_factor: Some(args.write_consistency_factor as u32),
-            on_disk_payload: Some(args.payload_on_disk),
-            optimizers_config: Some(OptimizersConfigDiff {
-                indexing_threshold: args.indexing_threshold.map(|i| i as u64),
-                memmap_threshold: args.memmap_threshold.map(|i| i as u64),
-                ..Default::default()
-            }),
-            ..Default::default()
+                            on_disk: Some(args.vectors_on_disk),
+                            datatype: None,
+                            multivector_config: None,
+                        },
+                    ),
+                    (
+                        UNUSED_VECTOR_NAME.to_string(), // unused vector to generate more complex config
+                        VectorParams {
+                            size: vec_dim as u64,
+                            distance: Distance::Cosine.into(),
+                            on_disk: Some(args.vectors_on_disk),
+                            ..Default::default()
+                        },
+                    ),
+                ]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
+            })),
         })
+        .replication_factor(args.replication_factor as u32)
+        .write_consistency_factor(args.write_consistency_factor as u32)
+        .on_disk_payload(args.payload_on_disk)
+        .optimizers_config(OptimizersConfigDiff {
+            indexing_threshold: args.indexing_threshold.map(|i| i as u64),
+            memmap_threshold: args.memmap_threshold.map(|i| i as u64),
+            ..Default::default()
+        });
+
+    if args.shard_number > 0 {
+        builder = builder.shard_number(args.shard_number as u32);
+    }
+
+    client
+        .create_collection(builder)
         .await
         .context(format!("Failed to create collection {}", collection_name))?;
     Ok(())
@@ -555,11 +481,11 @@ pub async fn create_collection(
 
 /// delete collection without checking if it exists
 pub async fn delete_collection(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<(), anyhow::Error> {
     client
-        .delete_collection(&collection_name)
+        .delete_collection(collection_name)
         .await
         .context(format!("Failed to delete collection {}", collection_name))?;
     Ok(())
@@ -567,12 +493,12 @@ pub async fn delete_collection(
 
 /// delete collection if exists & create new one
 pub async fn recreate_collection(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
-    if client.collection_exists(&collection_name).await? {
+    if client.collection_exists(collection_name).await? {
         log::info!("recreating existing collection {}", collection_name);
         delete_collection(client, collection_name).await?;
         sleep(Duration::from_secs(2)).await;
@@ -584,7 +510,7 @@ pub async fn recreate_collection(
 /// vec_dim = 0 means no vectors
 /// payload_count = 0 means no payloads
 pub async fn insert_points_batch(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     points_count: usize,
     vec_dim: usize,
@@ -636,15 +562,16 @@ pub async fn insert_points_batch(
             return Err(Cancelled);
         }
 
+        let mut builder = UpsertPointsBuilder::new(collection_name, points).wait(true);
+        if let Some(write_ordering) = write_ordering {
+            builder = builder.ordering(write_ordering);
+        }
         // push batch blocking
-        let resp = client
-            .upsert_points_blocking(collection_name, None, points, write_ordering.clone())
-            .await
-            .context(format!(
-                "Failed to insert {} points (batch {}/{}) into {}",
-                batch_size, batch_id, num_batches, collection_name
-            ))?;
-        if resp.result.clone().unwrap().status != 2 {
+        let resp = client.upsert_points(builder).await.context(format!(
+            "Failed to insert {} points (batch {}/{}) into {}",
+            batch_size, batch_id, num_batches, collection_name
+        ))?;
+        if resp.result.unwrap().status != 2 {
             return Err(Invariant(format!(
                 "Failed to insert {} points (batch {}/{}) into {} (status {})",
                 batch_size,
@@ -660,11 +587,11 @@ pub async fn insert_points_batch(
 
 /// Create collection snapshot
 pub async fn create_collection_snapshot(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<CreateSnapshotResponse, anyhow::Error> {
     client
-        .create_snapshot(&collection_name)
+        .create_snapshot(collection_name)
         .await
         .context(format!(
             "Failed to create collection snapshot for {}",
@@ -674,12 +601,15 @@ pub async fn create_collection_snapshot(
 
 /// Delete collection snapshot by name
 pub async fn delete_collection_snapshot(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     snapshot_name: &str,
 ) -> Result<(), anyhow::Error> {
     client
-        .delete_snapshot(&collection_name, snapshot_name)
+        .delete_snapshot(DeleteSnapshotRequestBuilder::new(
+            collection_name,
+            snapshot_name,
+        ))
         .await
         .context(format!(
             "Failed to delete collection snapshot {} for {}",
@@ -690,11 +620,11 @@ pub async fn delete_collection_snapshot(
 
 /// List collection snapshots
 pub async fn list_collection_snapshots(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<Vec<String>, anyhow::Error> {
     let snapshots = client
-        .list_snapshots(&collection_name)
+        .list_snapshots(collection_name)
         .await
         .context(format!(
             "Failed to list collection snapshots for {}",
@@ -709,50 +639,24 @@ pub async fn list_collection_snapshots(
 
 /// Count collection snapshots
 pub async fn count_collection_snapshots(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<usize, anyhow::Error> {
     let snapshots = list_collection_snapshots(client, collection_name).await?;
     Ok(snapshots.len())
 }
 
-/// Create field index (blocking)
-pub async fn create_field_index_blocking(
-    client: &QdrantClient,
-    collection_name: &str,
-    field_name: &str,
-    field_type: FieldType,
-) -> Result<(), anyhow::Error> {
-    client
-        .create_field_index_blocking(
-            collection_name.to_string(),
-            field_name.to_string(),
-            field_type,
-            None,
-            None,
-        )
-        .await
-        .context(format!(
-            "Failed to create field index {} for collection {}",
-            field_name, collection_name
-        ))?;
-    Ok(())
-}
-
-/// Create field index
+/// Create field index (non-blocking)
 pub async fn create_field_index(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     field_name: &str,
     field_type: FieldType,
 ) -> Result<(), anyhow::Error> {
     client
         .create_field_index(
-            collection_name.to_string(),
-            field_name.to_string(),
-            field_type,
-            None,
-            None,
+            CreateFieldIndexCollectionBuilder::new(collection_name, field_name, field_type)
+                .wait(false),
         )
         .await
         .context(format!(

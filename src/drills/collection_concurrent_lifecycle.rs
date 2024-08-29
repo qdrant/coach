@@ -1,5 +1,4 @@
 use anyhow::Result;
-use qdrant_client::client::QdrantClient;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -15,6 +14,7 @@ use async_trait::async_trait;
 use futures::stream::FuturesUnordered;
 use futures::{stream, StreamExt};
 use qdrant_client::qdrant::FieldType;
+use qdrant_client::Qdrant;
 
 /// Drill that creates and deletes a collection in parallel.
 /// The collection is created and populated with random data if it does not exist.
@@ -55,7 +55,7 @@ impl Drill for CollectionConcurrentLifecycle {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // delete if already exists
         if client.collection_exists(&self.collection_name).await? {
             delete_collection(client, &self.collection_name).await?;
@@ -200,7 +200,7 @@ impl Drill for CollectionConcurrentLifecycle {
         Ok(())
     }
 
-    async fn before_all(&self, _client: &QdrantClient, _args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(&self, _client: &Qdrant, _args: Arc<Args>) -> Result<(), CoachError> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())

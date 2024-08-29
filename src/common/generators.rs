@@ -1,8 +1,8 @@
 use core::option::Option;
 use core::option::Option::{None, Some};
-use qdrant_client::client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::{FieldCondition, Filter, Match};
+use qdrant_client::Payload;
 use rand::Rng;
 use std::collections::HashMap;
 

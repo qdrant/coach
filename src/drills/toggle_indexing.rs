@@ -1,5 +1,4 @@
 use anyhow::Result;
-use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::CollectionStatus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -13,6 +12,7 @@ use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
+use qdrant_client::Qdrant;
 
 /// Drill that performs index toggle on a collection.
 /// The collection is always re-created and populated with random data.
@@ -53,7 +53,7 @@ impl Drill for ToggleIndexing {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // delete if already exists
         if client.collection_exists(&self.collection_name).await? {
             delete_collection(client, &self.collection_name).await?;
@@ -123,7 +123,7 @@ impl Drill for ToggleIndexing {
         Ok(())
     }
 
-    async fn before_all(&self, _client: &QdrantClient, _args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(&self, _client: &Qdrant, _args: Arc<Args>) -> Result<(), CoachError> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())

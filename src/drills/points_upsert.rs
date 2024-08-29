@@ -1,5 +1,4 @@
 use anyhow::Result;
-use qdrant_client::client::QdrantClient;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -11,6 +10,7 @@ use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Invariant;
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
+use qdrant_client::Qdrant;
 
 /// Drill that consistently updates the same points.
 /// The collection is created and populated with random data if it does not exist.
@@ -48,10 +48,10 @@ impl Drill for PointsUpdate {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // create if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
-            log::info!("The update drill needs to setup the collection first");
+            log::info!("The points update drill needs to setup the collection first");
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
 
             // insert some points
@@ -108,7 +108,7 @@ impl Drill for PointsUpdate {
         Ok(())
     }
 
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;

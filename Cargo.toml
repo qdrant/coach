@@ -12,7 +12,7 @@ clap = { version = "4.5.16", features = ["derive"] }
 ctrlc = "3.4.5"
 futures = "0.3.30"
 async-trait = "0.1.81"
-qdrant-client = "1.9.0"
+qdrant-client = "1.11.2"
 rand = "0.8.5"
 tokio = { version = "1.39.3", features = ["full"] }
 log = "0.4.22"

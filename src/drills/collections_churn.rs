@@ -9,8 +9,8 @@ use crate::common::generators::KEYWORD_PAYLOAD_KEY;
 use crate::drill_runner::Drill;
 use anyhow::Result;
 use async_trait::async_trait;
-use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::FieldType;
+use qdrant_client::Qdrant;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -51,7 +51,7 @@ impl Drill for CollectionsChurn {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // cleanup potential left-over previous collections
         for i in 0..self.collection_count {
             if self.stopped.load(Ordering::Relaxed) {
@@ -114,7 +114,7 @@ impl Drill for CollectionsChurn {
         Ok(())
     }
 
-    async fn before_all(&self, _client: &QdrantClient, _args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(&self, _client: &Qdrant, _args: Arc<Args>) -> Result<(), CoachError> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())

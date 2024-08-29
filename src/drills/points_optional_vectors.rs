@@ -1,5 +1,4 @@
 use anyhow::Result;
-use qdrant_client::client::QdrantClient;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -13,6 +12,7 @@ use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
 use qdrant_client::qdrant::WriteOrdering;
+use qdrant_client::Qdrant;
 
 /// Drill that creates empty points in a collection.
 /// Those points are progressively filled with payload and named vectors.
@@ -53,7 +53,7 @@ impl Drill for PointsOptionalVectors {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
             log::info!("The points optional vectors drill needs to setup the collection first");
@@ -90,7 +90,7 @@ impl Drill for PointsOptionalVectors {
                 &self.collection_name,
                 point_id as u64,
                 self.payload_count,
-                self.write_ordering.clone(),
+                self.write_ordering,
             )
             .await?;
         }
@@ -106,7 +106,7 @@ impl Drill for PointsOptionalVectors {
                 point_id as u64,
                 self.vec_dim,
                 0,
-                self.write_ordering.clone(),
+                self.write_ordering,
             )
             .await?;
         }
@@ -126,7 +126,7 @@ impl Drill for PointsOptionalVectors {
         Ok(())
     }
 
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;

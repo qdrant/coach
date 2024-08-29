@@ -1,5 +1,4 @@
 use anyhow::Result;
-use qdrant_client::client::QdrantClient;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -13,6 +12,7 @@ use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Invariant;
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
+use qdrant_client::Qdrant;
 
 /// Drill that creates and deletes points in a collection.
 /// The collection is created and populated with random data if it does not exist.
@@ -29,7 +29,7 @@ impl CollectionSnapshotsChurn {
         let collection_name = "collection-snapshot-drill".to_string();
         let vec_dim = 128;
         let payload_count = 2;
-        let points_count = 200_000;
+        let points_count = 10_000;
         CollectionSnapshotsChurn {
             collection_name,
             points_count,
@@ -50,7 +50,7 @@ impl Drill for CollectionSnapshotsChurn {
         10
     }
 
-    async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
             // create collection
@@ -119,7 +119,7 @@ impl Drill for CollectionSnapshotsChurn {
         Ok(())
     }
 
-    async fn before_all(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;

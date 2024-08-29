@@ -9,7 +9,7 @@ use crate::healthcheck::run_healthcheck;
 use args::Args;
 use clap::Parser;
 use env_logger::Target;
-use qdrant_client::client::QdrantClientConfig;
+use qdrant_client::config::QdrantConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -52,8 +52,8 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_config(url: &str, timeout_ms: usize) -> QdrantClientConfig {
-    let mut config = QdrantClientConfig::from_url(url);
+fn get_config(url: &str, timeout_ms: usize) -> QdrantConfig {
+    let mut config = QdrantConfig::from_url(url);
     config.timeout = Duration::from_millis(timeout_ms as u64);
     config.connect_timeout = Duration::from_millis(timeout_ms as u64);
 

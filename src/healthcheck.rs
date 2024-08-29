@@ -5,7 +5,7 @@ use anyhow::Result;
 use hdrhistogram::Histogram;
 use log::error;
 use log::info;
-use qdrant_client::client::QdrantClient;
+use qdrant_client::Qdrant;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,7 +22,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             let client_config = get_config(&uri, 60 * 1000);
             // validate timeout manually
             let max_healthcheck_timeout_ms = args.grpc_health_check_timeout_ms as u64;
-            let client = QdrantClient::new(Some(client_config));
+            let client = Qdrant::new(client_config);
             // fails only if the configuration is invalid
             if let Err(e) = client {
                 error!("Failed to create healthcheck client for {}: {}", uri, e);
@@ -84,7 +84,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
                             );
                         }
                         // always set last error and increment failures
-                        last_error = Some(e);
+                        last_error = Some(e.into());
                         failures += 1;
                     }
                 }
