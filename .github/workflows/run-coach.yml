@@ -1,0 +1,73 @@
+name: Coach
+
+on:
+  push:
+    branches: [ "master", "automation" ]
+  schedule:
+    # every day at 12 CET
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+    inputs:
+      qdrant_version:
+        description: "Version of qdrant to pull the container for (tags/v1.6.1, <commit-id>, my-branch)"
+        default: dev
+      coaching_time:
+        description: "Duration in seconds, default is 3600s (60 min) "
+        default: 3600
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process inputs
+        id: default_inputs
+        run: |
+          qdrant_version="${{ inputs.qdrant_version }}"
+          if [ -z "$qdrant_version" ]; then
+            qdrant_version=dev
+          fi
+
+          coaching_time="${{ inputs.coaching_time }}"
+          if [ -z "$coaching_time" ]; then
+            coaching_time=3600
+          fi
+
+          echo "qdrant_version=$qdrant_version" >> $GITHUB_OUTPUT
+          echo "coaching_time=$coaching_time" >> $GITHUB_OUTPUT
+      - name: Install minimal stable
+        uses: dtolnay/rust-toolchain@stable
+      # checkout coach
+      - name: Checkout Coach
+        uses: actions/checkout@v4
+      - name: Build Coach (release)
+        run: cargo build --release
+      - name: Coach things
+        shell: bash
+        run: |
+          coaching_time="${{ steps.default_inputs.outputs.coaching_time }}"
+          qdrant_version="${{ steps.default_inputs.outputs.qdrant_version }}"
+
+          ./coach-things.sh "$coaching_time" "$qdrant_version"
+      - name: Send Notification
+        if: failure() || cancelled()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "Coach run status: ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Something is wrong.\nView the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.COACH_CHANNEL_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
