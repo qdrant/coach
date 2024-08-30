@@ -3,7 +3,7 @@
 set -e
 
 RUN_TIME=${1:-300}
-QDRANT_VERSION=${2:dev}
+QDRANT_VERSION=${2:-dev}
 
 REST_PORT="6333"
 GRPC_PORT="6334"
@@ -32,7 +32,7 @@ done
 COACH_CMD=(
     cargo run --release
     --
-    -p 1 # number of concurrent workloads
+    -p 2 # number of concurrent workloads
     --stop-at-first-error
     --grpc-timeout-ms 10000
     --grpc-health-check-timeout-ms 1000
