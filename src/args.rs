@@ -50,7 +50,7 @@ pub struct Args {
     #[arg(long, default_value_t = false)]
     pub only_healthcheck: bool,
     /// Delay between health checks
-    #[arg(long, default_value_t = 200)]
+    #[arg(long, default_value_t = 100)]
     pub health_check_delay_ms: usize,
     /// Name of the drills to ignore
     #[arg(long)]

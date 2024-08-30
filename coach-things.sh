@@ -35,7 +35,6 @@ COACH_CMD=(
     -p 2 # number of concurrent workloads
     --stop-at-first-error
     --grpc-timeout-ms 10000
-    --grpc-health-check-timeout-ms 100
 )
 
 echo ""
