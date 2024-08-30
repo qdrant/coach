@@ -31,7 +31,7 @@ jobs:
           fi
 
           coaching_time="${{ inputs.coaching_time }}"
-          if [ -z "coaching_time" ]; then
+          if [ -z "$coaching_time" ]; then
             coaching_time=3600
           fi
 
