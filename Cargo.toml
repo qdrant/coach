@@ -14,7 +14,7 @@ futures = "0.3.30"
 async-trait = "0.1.81"
 qdrant-client = "1.11.2"
 rand = "0.8.5"
-tokio = { version = "1.39.3", features = ["full"] }
+tokio = { version = "1.40.0", features = ["full"] }
 log = "0.4.22"
 env_logger = "0.11.5"
 hdrhistogram = "7.5.4"

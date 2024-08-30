@@ -32,7 +32,7 @@ done
 COACH_CMD=(
     cargo run --release
     --
-    --parallel_drills 3
+    --parallel-drills 3
     --stop-at-first-error
 )
 
