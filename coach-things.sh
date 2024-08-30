@@ -32,7 +32,7 @@ done
 COACH_CMD=(
     cargo run --release
     --
-    -p 2 # number of concurrent workloads
+    -p 3 # number of concurrent workloads
     --stop-at-first-error
     --grpc-timeout-ms 10000
 )
