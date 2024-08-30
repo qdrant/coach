@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: |
           coaching_time="${{ steps.default_inputs.outputs.coaching_time }}"
-          qdrant_version="${{ inputs.default_inputs.outputs.qdrant_version }}"
+          qdrant_version="${{ steps.default_inputs.outputs.qdrant_version }}"
 
           ./coach-things.sh "$coaching_time" "$qdrant_version"
       - name: Send Notification
