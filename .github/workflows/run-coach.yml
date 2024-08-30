@@ -36,7 +36,7 @@ jobs:
           fi
 
           echo "qdrant_version=$qdrant_version" >> $GITHUB_OUTPUT
-          echo "coaching_time=coaching_time" >> $GITHUB_OUTPUT
+          echo "coaching_time=$coaching_time" >> $GITHUB_OUTPUT
       - name: Install minimal stable
         uses: dtolnay/rust-toolchain@stable
       # checkout coach
