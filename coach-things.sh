@@ -44,7 +44,7 @@ echo "${COACH_CMD[*]}"
 
 pid=$!
 
-echo "The PID is $pid"
+echo "The coach PID is $pid"
 
 function cleanup() {
     if ps -p $pid >/dev/null
