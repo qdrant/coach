@@ -32,9 +32,8 @@ done
 COACH_CMD=(
     cargo run --release
     --
-    -p 3 # number of concurrent workloads
+    --parallel_drills 3
     --stop-at-first-error
-    --grpc-timeout-ms 10000
 )
 
 echo ""
