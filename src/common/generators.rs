@@ -9,8 +9,8 @@ use std::collections::HashMap;
 pub const KEYWORD_PAYLOAD_KEY: &str = "a";
 
 pub fn random_keyword(num_variants: usize) -> String {
-    let mut rng = rand::thread_rng();
-    let variant = rng.gen_range(0..num_variants);
+    let mut rng = rand::rng();
+    let variant = rng.random_range(0..num_variants);
     format!("keyword_{}", variant)
 }
 
@@ -58,8 +58,8 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
 }
 
 pub fn random_vector(dim: usize) -> Vec<f32> {
-    let mut rng = rand::thread_rng();
-    (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
+    let mut rng = rand::rng();
+    (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect()
 }
 
 pub fn random_named_vector(named: String, dim: usize) -> HashMap<String, Vec<f32>> {
