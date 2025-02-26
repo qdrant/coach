@@ -1,7 +1,7 @@
 use anyhow::Result;
 use qdrant_client::qdrant::CollectionStatus;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::args::Args;
 use crate::common::client::{

@@ -10,8 +10,8 @@ use args::Args;
 use clap::Parser;
 use env_logger::Target;
 use qdrant_client::config::QdrantConfig;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 #[tokio::main]

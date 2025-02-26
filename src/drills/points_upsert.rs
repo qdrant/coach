@@ -1,6 +1,6 @@
 use anyhow::Result;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use crate::args::Args;
 use crate::common::client::{

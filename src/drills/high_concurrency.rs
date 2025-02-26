@@ -1,6 +1,6 @@
 use anyhow::Result;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::args::Args;
 use crate::common::client::{
@@ -13,8 +13,8 @@ use crate::drill_runner::Drill;
 use crate::get_config;
 use async_trait::async_trait;
 use futures::StreamExt;
-use qdrant_client::qdrant::WriteOrdering;
 use qdrant_client::Qdrant;
+use qdrant_client::qdrant::WriteOrdering;
 
 /// Drill that performs operations on a collection with a high level of concurrency (without indexing).
 /// Run `concurrency_level` workers which repeatedly call APIs for inserting -> searching -> set payload -> updating -> getting one -> deleting

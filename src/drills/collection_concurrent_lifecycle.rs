@@ -1,6 +1,6 @@
 use anyhow::Result;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::args::Args;
 use crate::common::client::{
@@ -12,9 +12,9 @@ use crate::common::generators::KEYWORD_PAYLOAD_KEY;
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
 use futures::stream::FuturesUnordered;
-use futures::{stream, StreamExt};
-use qdrant_client::qdrant::FieldType;
+use futures::{StreamExt, stream};
 use qdrant_client::Qdrant;
+use qdrant_client::qdrant::FieldType;
 
 /// Drill that creates and deletes a collection in parallel.
 /// The collection is created and populated with random data if it does not exist.
@@ -136,7 +136,7 @@ impl Drill for CollectionConcurrentLifecycle {
                     return Err(Invariant(format!(
                         "Deleting collection should not fail - {:?}",
                         e
-                    )))
+                    )));
                 }
             }
         }

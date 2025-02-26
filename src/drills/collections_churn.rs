@@ -9,10 +9,10 @@ use crate::common::generators::KEYWORD_PAYLOAD_KEY;
 use crate::drill_runner::Drill;
 use anyhow::Result;
 use async_trait::async_trait;
-use qdrant_client::qdrant::FieldType;
 use qdrant_client::Qdrant;
-use std::sync::atomic::{AtomicBool, Ordering};
+use qdrant_client::qdrant::FieldType;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
 

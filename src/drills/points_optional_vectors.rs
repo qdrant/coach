@@ -1,6 +1,6 @@
 use anyhow::Result;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::args::Args;
 use crate::common::client::{
@@ -11,8 +11,8 @@ use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
 use crate::drill_runner::Drill;
 use async_trait::async_trait;
-use qdrant_client::qdrant::WriteOrdering;
 use qdrant_client::Qdrant;
+use qdrant_client::qdrant::WriteOrdering;
 
 /// Drill that creates empty points in a collection.
 /// Those points are progressively filled with payload and named vectors.

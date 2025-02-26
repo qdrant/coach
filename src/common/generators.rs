@@ -1,8 +1,8 @@
 use core::option::Option;
 use core::option::Option::{None, Some};
+use qdrant_client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::{FieldCondition, Filter, Match};
-use qdrant_client::Payload;
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -50,11 +50,7 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
             .into(),
         )
     }
-    if have_any {
-        Some(filter)
-    } else {
-        None
-    }
+    if have_any { Some(filter) } else { None }
 }
 
 pub fn random_vector(dim: usize) -> Vec<f32> {

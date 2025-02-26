@@ -5,6 +5,7 @@ use crate::common::generators::{
     random_filter, random_named_vector, random_payload, random_vector,
 };
 use anyhow::Context;
+use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
@@ -16,10 +17,9 @@ use qdrant_client::qdrant::{
     SearchPointsBuilder, SearchResponse, SetPayloadPointsBuilder, UpdateCollectionBuilder,
     UpsertPointsBuilder, VectorParams, VectorParamsMap, VectorsConfig, WriteOrdering,
 };
-use qdrant_client::Qdrant;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
 
