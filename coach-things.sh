@@ -18,6 +18,8 @@ docker run -d --rm \
            -p ${REST_PORT}:${REST_PORT} \
            -p ${GRPC_PORT}:${GRPC_PORT} \
            -e QDRANT__SERVICE__GRPC_PORT=${GRPC_PORT} \
+           -e QDRANT__SERVICE__HARDWARE_REPORTING=true \
+           -e QDRANT__STORAGE__COLLECTION_STRICT_MODE=true \
            --name qdrant_test qdrant/qdrant:"${QDRANT_VERSION}" ./qdrant --disable-telemetry
 
 trap stop_docker SIGINT
