@@ -2,7 +2,7 @@ use core::option::Option;
 use core::option::Option::{None, Some};
 use qdrant_client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
-use qdrant_client::qdrant::{FieldCondition, Filter, Match};
+use qdrant_client::qdrant::{Condition, Filter};
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -34,21 +34,10 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
     let mut have_any = false;
     if let Some(keyword_variants) = keywords {
         have_any = true;
-        filter.must.push(
-            FieldCondition {
-                key: KEYWORD_PAYLOAD_KEY.to_string(),
-                r#match: Some(Match {
-                    match_value: Some(MatchValue::Keyword(random_keyword(keyword_variants))),
-                }),
-                range: None,
-                geo_bounding_box: None,
-                geo_radius: None,
-                values_count: None,
-                geo_polygon: None,
-                datetime_range: None,
-            }
-            .into(),
-        )
+        filter.must.push(Condition::matches(
+            KEYWORD_PAYLOAD_KEY.to_string(),
+            MatchValue::Keyword(random_keyword(keyword_variants)),
+        ))
     }
     if have_any { Some(filter) } else { None }
 }
