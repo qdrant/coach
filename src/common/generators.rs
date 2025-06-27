@@ -11,7 +11,7 @@ pub const KEYWORD_PAYLOAD_KEY: &str = "a";
 pub fn random_keyword(num_variants: usize) -> String {
     let mut rng = rand::rng();
     let variant = rng.random_range(0..num_variants);
-    format!("keyword_{}", variant)
+    format!("keyword_{variant}")
 }
 
 pub fn random_payload(keywords: Option<usize>) -> Payload {

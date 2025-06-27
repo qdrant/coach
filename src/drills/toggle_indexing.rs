@@ -113,8 +113,7 @@ impl Drill for ToggleIndexing {
         let collection_status = get_collection_status(client, &self.collection_name).await?;
         if collection_status != CollectionStatus::Green {
             return Err(Invariant(format!(
-                "Collection status is not Green after indexing but {:?}",
-                collection_status
+                "Collection status is not Green after indexing but {collection_status:?}"
             )));
         }
 

@@ -111,8 +111,7 @@ impl Drill for CollectionSnapshotsChurn {
         // assert snapshot count after
         if post_delete_snapshot_count != snapshot_count {
             return Err(Invariant(format!(
-                "Collection snapshot count is wrong {} vs {}",
-                post_delete_snapshot_count, snapshot_count
+                "Collection snapshot count is wrong {post_delete_snapshot_count} vs {snapshot_count}"
             )));
         }
 

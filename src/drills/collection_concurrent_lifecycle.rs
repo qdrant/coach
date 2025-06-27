@@ -81,14 +81,13 @@ impl Drill for CollectionConcurrentLifecycle {
             match result {
                 Ok(_) => {} // at least one creation should be successful
                 Err(e) => {
-                    let msg = format!("{:?}", e);
+                    let msg = format!("{e:?}");
                     if !msg.contains(&format!(
                         "Collection `{}` already exists!",
                         self.collection_name
                     )) {
                         return Err(Invariant(format!(
-                            "Creating collection failed for the wrong reason - {:?}",
-                            msg
+                            "Creating collection failed for the wrong reason - {msg:?}"
                         )));
                     }
                 }
@@ -134,8 +133,7 @@ impl Drill for CollectionConcurrentLifecycle {
                 Ok(_) => {}
                 Err(e) => {
                     return Err(Invariant(format!(
-                        "Deleting collection should not fail - {:?}",
-                        e
+                        "Deleting collection should not fail - {e:?}"
                     )));
                 }
             }
@@ -169,14 +167,13 @@ impl Drill for CollectionConcurrentLifecycle {
                      match creation_res {
                         Ok(_) => {},
                         Err(e) => {
-                            let msg = format!("{:?}", e);
+                            let msg = format!("{e:?}");
                             if !msg.contains(&format!(
                                 "Collection `{}` already exists!",
                                 self.collection_name
                             )) {
                                 return Err(Invariant(format!(
-                                    "Creating collection failed for the wrong reason - {:?}",
-                                    msg
+                                    "Creating collection failed for the wrong reason - {msg:?}"
                                 )));
                             }
                         }
@@ -187,8 +184,7 @@ impl Drill for CollectionConcurrentLifecycle {
                         Ok(_) => {},
                         Err(e) => {
                             return Err(Invariant(format!(
-                                "Deleting collection should not fail - {:?}",
-                                e
+                                "Deleting collection should not fail - {e:?}"
                             )))
                         }
                     }

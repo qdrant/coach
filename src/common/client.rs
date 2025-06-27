@@ -34,8 +34,7 @@ pub async fn get_point_by_id(
         .get_points(GetPointsBuilder::new(collection_name, &[point_id_grpc]))
         .await
         .context(format!(
-            "Failed to get point by id {} from {}",
-            point_id, collection_name
+            "Failed to get point by id {point_id} from {collection_name}"
         ))?;
     Ok(point.result.first().cloned())
 }
@@ -65,8 +64,7 @@ pub async fn upsert_point_by_id(
         builder = builder.ordering(write_ordering);
     }
     client.upsert_points(builder).await.context(format!(
-        "Failed to update point_id:{} in {}",
-        point_id, collection_name
+        "Failed to update point_id:{point_id} in {collection_name}"
     ))?;
 
     Ok(())
@@ -91,8 +89,7 @@ pub async fn delete_point_by_id(
         )
         .await
         .context(format!(
-            "Failed to delete point_id {} for {}",
-            point_id, collection_name
+            "Failed to delete point_id {point_id} for {collection_name}"
         ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
@@ -128,8 +125,7 @@ pub async fn set_payload(
     }
 
     let resp = client.set_payload(builder).await.context(format!(
-        "Failed to set payload for {} with payload_count {}",
-        point_id, payload_count
+        "Failed to set payload for {point_id} with payload_count {payload_count}"
     ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
@@ -163,7 +159,7 @@ pub async fn search_points(
     let response = client
         .search_points(builder)
         .await
-        .context(format!("Failed to search points on {}", collection_name))?;
+        .context(format!("Failed to search points on {collection_name}"))?;
 
     Ok(response)
 }
@@ -188,7 +184,7 @@ pub async fn scroll_points(
     let response = client
         .scroll(builder)
         .await
-        .context(format!("Failed to scroll points on {}", collection_name))?;
+        .context(format!("Failed to scroll points on {collection_name}"))?;
 
     Ok(response)
 }
@@ -203,7 +199,7 @@ pub async fn retrieve_points(
     let response = client
         .get_points(GetPointsBuilder::new(collection_name, ids).with_vectors(true))
         .await
-        .context(format!("Failed to retrieve points on {}", collection_name))?;
+        .context(format!("Failed to retrieve points on {collection_name}"))?;
 
     Ok(response)
 }
@@ -217,8 +213,7 @@ pub async fn get_points_count(
         .collection_info(collection_name)
         .await
         .context(format!(
-            "Failed to fetch points count for {}",
-            collection_name
+            "Failed to fetch points count for {collection_name}"
         ))?
         .result
         .unwrap()
@@ -247,8 +242,7 @@ pub async fn delete_points(
         )
         .await
         .context(format!(
-            "Failed to delete {} points for {}",
-            points_count, collection_name
+            "Failed to delete {points_count} points for {collection_name}"
         ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
@@ -289,8 +283,7 @@ pub async fn set_indexing_threshold(
         )
         .await
         .context(format!(
-            "Failed to set indexing threshold to {} for {}",
-            threshold, collection_name
+            "Failed to set indexing threshold to {threshold} for {collection_name}"
         ))?;
     Ok(())
 }
@@ -311,8 +304,7 @@ pub async fn set_mmap_threshold(
         )
         .await
         .context(format!(
-            "Failed to set mmap threshold to {} for {}",
-            threshold, collection_name
+            "Failed to set mmap threshold to {threshold} for {collection_name}"
         ))?;
     Ok(())
 }
@@ -333,8 +325,7 @@ pub async fn set_max_segment_size(
         )
         .await
         .context(format!(
-            "Failed to set max segment size to {} for {}",
-            size, collection_name
+            "Failed to set max segment size to {size} for {collection_name}"
         ))?;
     Ok(())
 }
@@ -348,8 +339,7 @@ pub async fn get_collection_info(
         .collection_info(collection_name)
         .await
         .context(format!(
-            "Failed to fetch collection info for {}",
-            collection_name
+            "Failed to fetch collection info for {collection_name}"
         ))?
         .result;
     Ok(collection_info)
@@ -475,7 +465,7 @@ pub async fn create_collection(
     client
         .create_collection(builder)
         .await
-        .context(format!("Failed to create collection {}", collection_name))?;
+        .context(format!("Failed to create collection {collection_name}"))?;
     Ok(())
 }
 
@@ -487,7 +477,7 @@ pub async fn delete_collection(
     client
         .delete_collection(collection_name)
         .await
-        .context(format!("Failed to delete collection {}", collection_name))?;
+        .context(format!("Failed to delete collection {collection_name}"))?;
     Ok(())
 }
 
@@ -499,7 +489,7 @@ pub async fn recreate_collection(
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
     if client.collection_exists(collection_name).await? {
-        log::info!("recreating existing collection {}", collection_name);
+        log::info!("recreating existing collection {collection_name}");
         delete_collection(client, collection_name).await?;
         sleep(Duration::from_secs(2)).await;
     }
@@ -568,8 +558,7 @@ pub async fn insert_points_batch(
         }
         // push batch blocking
         let resp = client.upsert_points(builder).await.context(format!(
-            "Failed to insert {} points (batch {}/{}) into {}",
-            batch_size, batch_id, num_batches, collection_name
+            "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name}"
         ))?;
         if resp.result.unwrap().status != 2 {
             return Err(Invariant(format!(
@@ -594,8 +583,7 @@ pub async fn create_collection_snapshot(
         .create_snapshot(collection_name)
         .await
         .context(format!(
-            "Failed to create collection snapshot for {}",
-            collection_name
+            "Failed to create collection snapshot for {collection_name}"
         ))
 }
 
@@ -612,8 +600,7 @@ pub async fn delete_collection_snapshot(
         ))
         .await
         .context(format!(
-            "Failed to delete collection snapshot {} for {}",
-            snapshot_name, collection_name
+            "Failed to delete collection snapshot {snapshot_name} for {collection_name}"
         ))?;
     Ok(())
 }
@@ -627,8 +614,7 @@ pub async fn list_collection_snapshots(
         .list_snapshots(collection_name)
         .await
         .context(format!(
-            "Failed to list collection snapshots for {}",
-            collection_name
+            "Failed to list collection snapshots for {collection_name}"
         ))?
         .snapshot_descriptions;
     Ok(snapshots
@@ -660,8 +646,7 @@ pub async fn create_field_index(
         )
         .await
         .context(format!(
-            "Failed to create field index {} for collection {}",
-            field_name, collection_name
+            "Failed to create field index {field_name} for collection {collection_name}"
         ))?;
     Ok(())
 }

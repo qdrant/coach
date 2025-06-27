@@ -96,8 +96,7 @@ impl Drill for CollectionsChurn {
             let info = get_collection_info(client, &collection_name).await?;
             if info.is_none() {
                 return Err(CoachError::Invariant(format!(
-                    "Collection info for {} was not found after it was created",
-                    collection_name
+                    "Collection info for {collection_name} was not found after it was created"
                 )));
             }
         }

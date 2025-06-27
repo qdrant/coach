@@ -189,7 +189,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                                 .push_str(&format!("{} in {:?} ({}), ", r.uri, r.duration, e));
                         }
                     }
-                    error!("{}", display_report);
+                    error!("{display_report}");
                     // stop coach in case pf no successful run if configured
                     if args_arc.stop_at_first_error {
                         info!("Stopping coach because stop_at_first_error is set");
@@ -211,7 +211,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                             display_report.push_str(&format!("{} ({}), ", r.uri, e));
                         }
                     }
-                    warn!("{}", display_report);
+                    warn!("{display_report}");
                 }
 
                 // release semaphore while waiting for reschedule

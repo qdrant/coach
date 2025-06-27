@@ -25,7 +25,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             let client = Qdrant::new(client_config);
             // fails only if the configuration is invalid
             if let Err(e) = client {
-                error!("Failed to create healthcheck client for {}: {}", uri, e);
+                error!("Failed to create healthcheck client for {uri}: {e}");
                 return;
             }
             // safe unwrap

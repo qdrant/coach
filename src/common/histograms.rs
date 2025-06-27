@@ -7,7 +7,6 @@ pub fn render_histogram(histogram: &Histogram<u64>) -> String {
     let p99 = histogram.value_at_quantile(0.99);
     let max = histogram.max();
     format!(
-        "[min: {}ms, p50: {}ms, p95: {}ms, p99: {}ms, max: {}ms]",
-        min, p50, p95, p99, max
+        "[min: {min}ms, p50: {p50}ms, p95: {p95}ms, p99: {p99}ms, max: {max}ms]"
     )
 }

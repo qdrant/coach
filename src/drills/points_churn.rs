@@ -87,8 +87,7 @@ impl Drill for PointsChurn {
         let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != 0 {
             return Err(Invariant(format!(
-                "Collection should be empty but got {} points",
-                points_count
+                "Collection should be empty but got {points_count} points"
             )));
         }
 
