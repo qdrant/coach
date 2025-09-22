@@ -16,10 +16,10 @@ pub fn random_keyword(num_variants: usize) -> String {
 
 pub fn random_payload(keywords: Option<usize>) -> Payload {
     let mut payload = Payload::new();
-    if let Some(keyword_variants) = keywords {
-        if keyword_variants > 0 {
-            payload.insert(KEYWORD_PAYLOAD_KEY, random_keyword(keyword_variants));
-        }
+    if let Some(keyword_variants) = keywords
+        && keyword_variants > 0
+    {
+        payload.insert(KEYWORD_PAYLOAD_KEY, random_keyword(keyword_variants));
     }
     payload
 }
