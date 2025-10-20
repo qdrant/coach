@@ -21,7 +21,8 @@ docker run -d --rm \
            -e QDRANT__SERVICE__HARDWARE_REPORTING=false \
            -e QDRANT__STORAGE__COLLECTION_STRICT_MODE=true \
            -e QDRANT__FEATURE_FLAGS__ALL=true \
-           --name qdrant_test qdrant/qdrant:"${QDRANT_VERSION}" ./qdrant --disable-telemetry
+           -e QDRANT__CLUSTER__ENABLED=true \
+           --name qdrant_test qdrant/qdrant:"${QDRANT_VERSION}" ./qdrant --disable-telemetry --uri http://127.0.0.1:6335
 
 trap stop_docker SIGINT
 trap stop_docker ERR
