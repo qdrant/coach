@@ -418,6 +418,7 @@ pub async fn create_collection(
                                 max_indexing_threads: args.max_indexing_threads.map(|i| i as u64),
                                 on_disk: Some(args.hnsw_on_disk),
                                 payload_m: None,
+                                inline_storage: None,
                             }),
                             quantization_config: if args.use_scalar_quantization {
                                 Some(QuantizationConfig {
