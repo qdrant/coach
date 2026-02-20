@@ -3,7 +3,7 @@ use core::option::Option::{None, Some};
 use qdrant_client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::{Condition, Filter};
-use rand::Rng;
+use rand::RngExt;
 use std::collections::HashMap;
 
 pub const KEYWORD_PAYLOAD_KEY: &str = "a";
