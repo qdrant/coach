@@ -561,14 +561,10 @@ pub async fn insert_points_batch(
         let resp = client.upsert_points(builder).await.context(format!(
             "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name}"
         ))?;
-        if resp.result.unwrap().status != 2 {
+        let status = resp.result.unwrap().status;
+        if status != 2 {
             return Err(Invariant(format!(
-                "Failed to insert {} points (batch {}/{}) into {} (status {})",
-                batch_size,
-                batch_id,
-                num_batches,
-                collection_name,
-                resp.result.unwrap().status
+                "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name} (status {status})"
             )));
         }
     }
