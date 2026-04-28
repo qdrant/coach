@@ -8,13 +8,13 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.102"
 thiserror = "2.0.18"
-clap = { version = "4.5.60", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 ctrlc = "3.5.2"
 futures = "0.3.32"
 async-trait = "0.1.89"
 qdrant-client = "1.17.0"
-rand = "0.10.0"
-tokio = { version = "1.49.0", features = ["full"] }
+rand = "0.10.1"
+tokio = { version = "1.52.1", features = ["full"] }
 log = "0.4.29"
-env_logger = "0.11.9"
+env_logger = "0.11.10"
 hdrhistogram = "7.5.4"
