@@ -67,7 +67,7 @@ impl Drill for CollectionConcurrentLifecycle {
 
         // test concurrent create collection
         let mut creations = FuturesUnordered::new();
-        for _ in 0..1 {
+        for _ in 0..self.parallelism {
             let args = args.clone();
             creations.push(async move {
                 create_collection(client, &self.collection_name, self.vec_dim, args).await
