@@ -15,6 +15,7 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::WriteOrdering;
+use rand::RngExt;
 
 /// Drill that performs operations on a collection with a high level of concurrency (without indexing).
 /// Run `concurrency_level` workers which repeatedly call APIs for inserting -> searching -> set payload -> updating -> getting one -> deleting
@@ -106,7 +107,7 @@ impl HighConcurrency {
     }
 
     fn pick_random<'a>(&self, clients: &'a [Qdrant]) -> &'a Qdrant {
-        let index = rand::random::<u64>() as usize % clients.len();
+        let index = rand::rng().random_range(0..clients.len());
         &clients[index]
     }
 }

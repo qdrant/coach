@@ -45,12 +45,18 @@ Options:
           Whether to use scalar quantization for vectors
       --vectors-on-disk
           If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM
+      --payload-on-disk
+          If true - point's payload will not be stored in memory
+      --hnsw-on-disk
+          If set to false, the index will be stored in RAM
+      --max-indexing-threads <MAX_INDEXING_THREADS>
+          Number of parallel threads used for background index building
       --stop-at-first-error
           Stop all drills at the first error encountered
       --only-healthcheck
           Only run the healthcheck for the input URI, no drills executed
       --health-check-delay-ms <HEALTH_CHECK_DELAY_MS>
-          Delay between health checks [default: 200]
+          Delay between health checks [default: 100]
       --ignored-drills <IGNORED_DRILLS>
           Name of the drills to ignore
       --drills-to-run <DRILLS_TO_RUN>

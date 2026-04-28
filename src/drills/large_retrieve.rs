@@ -80,7 +80,7 @@ impl Drill for LargeRetrieve {
         }
 
         // retrieve all points at once
-        let ids: Vec<_> = (1..self.points_count - 1).collect();
+        let ids: Vec<_> = (0..self.points_count).collect();
 
         // retrieve `retrieve_count` times
         for _i in 0..self.retrieve_count {
