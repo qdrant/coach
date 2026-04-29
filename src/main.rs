@@ -10,37 +10,32 @@ use args::Args;
 use clap::Parser;
 use env_logger::Target;
 use qdrant_client::config::QdrantConfig;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     setup_logger();
-    let stopped = Arc::new(AtomicBool::new(false));
-    let r = stopped.clone();
+    let cancel = CancellationToken::new();
+    let r = cancel.clone();
 
     ctrlc::set_handler(move || {
         log::info!("Coach is stopping");
-        r.store(true, Ordering::SeqCst);
+        r.cancel();
     })
     .expect("Error setting Ctrl-C handler");
 
     let mut handles = vec![];
 
     // start healthcheck
-    let healthcheck_handles = run_healthcheck(args.clone(), stopped.clone()).await?;
-    for handle in healthcheck_handles {
-        handles.push(handle);
-    }
+    let healthcheck_handles = run_healthcheck(args.clone(), cancel.clone()).await?;
+    handles.extend(healthcheck_handles);
 
     if !args.only_healthcheck {
         // start drills
-        let drill_handles = run_drills(args, stopped).await?;
-        for handle in drill_handles {
-            handles.push(handle);
-        }
+        let drill_handles = run_drills(args, cancel).await?;
+        handles.extend(drill_handles);
     } else {
         log::info!("Only healthcheck is enabled, no drills will be executed");
     }

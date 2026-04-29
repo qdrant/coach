@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
@@ -20,7 +20,7 @@ use qdrant_client::qdrant::FieldType;
 /// The collection is created and populated with random data if it does not exist.
 pub struct CollectionConcurrentLifecycle {
     collection_name: String,
-    stopped: Arc<AtomicBool>,
+    stopped: CancellationToken,
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
@@ -28,7 +28,7 @@ pub struct CollectionConcurrentLifecycle {
 }
 
 impl CollectionConcurrentLifecycle {
-    pub fn new(stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "collection-concurrent-lifecycle-drill".to_string();
         let vec_dim = 512;
         let payload_count = 2;
@@ -61,7 +61,7 @@ impl Drill for CollectionConcurrentLifecycle {
             delete_collection(client, &self.collection_name).await?;
         }
 
-        if self.stopped.load(Ordering::Relaxed) {
+        if self.stopped.is_cancelled() {
             return Err(Cancelled);
         }
 
@@ -75,7 +75,7 @@ impl Drill for CollectionConcurrentLifecycle {
         }
 
         while let Some(result) = creations.next().await {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             match result {
@@ -94,7 +94,7 @@ impl Drill for CollectionConcurrentLifecycle {
             }
         }
 
-        if self.stopped.load(Ordering::Relaxed) {
+        if self.stopped.is_cancelled() {
             return Err(Cancelled);
         }
 
@@ -126,7 +126,7 @@ impl Drill for CollectionConcurrentLifecycle {
         }
 
         while let Some(result) = deletions.next().await {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             match result {
@@ -156,7 +156,7 @@ impl Drill for CollectionConcurrentLifecycle {
         let mut deletions_stream = stream::iter(deletions).buffer_unordered(1);
 
         loop {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             // make sure the collection does not exist (do not care about this result)

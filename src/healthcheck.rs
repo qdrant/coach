@@ -6,13 +6,12 @@ use hdrhistogram::Histogram;
 use log::error;
 use log::info;
 use qdrant_client::Qdrant;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
+use tokio_util::sync::CancellationToken;
 
-pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<JoinHandle<()>>> {
+pub async fn run_healthcheck(args: Args, cancel: CancellationToken) -> Result<Vec<JoinHandle<()>>> {
     // build one client per URI up front - propagate config errors before spawning
     // use 1 minute as upper bound timeout for client healthcheck
     let mut clients: Vec<(String, Qdrant)> = Vec::with_capacity(args.uris.len());
@@ -27,7 +26,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
     let mut healthcheck_tasks = Vec::with_capacity(clients.len());
     // one task per uri
     for (uri, client) in clients {
-        let stopped = stopped.clone();
+        let cancel = cancel.clone();
         let handle = tokio::spawn(async move {
             // record errors for deduplication
             let mut last_error: Option<anyhow::Error> = None;
@@ -35,7 +34,7 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             // track latencies in the range [1 msec..1 hour]
             let mut hist = Histogram::<u64>::new_with_bounds(1, 60 * 60 * 1000, 2).unwrap();
             let healthcheck_timeout = Duration::from_millis(max_healthcheck_timeout_ms);
-            while !stopped.load(Ordering::Relaxed) {
+            while !cancel.is_cancelled() {
                 let execution_start = Instant::now();
                 let health_check_result =
                     tokio::time::timeout(healthcheck_timeout, client.health_check()).await;
@@ -86,8 +85,11 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
                         failures += 1;
                     }
                 }
-                // delay between checks
-                tokio::time::sleep(health_check_delay_ms).await;
+                // delay between checks - exit early on cancel
+                tokio::select! {
+                    _ = tokio::time::sleep(health_check_delay_ms) => {}
+                    _ = cancel.cancelled() => break,
+                }
             }
         });
         healthcheck_tasks.push(handle);

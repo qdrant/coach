@@ -12,9 +12,9 @@ use async_trait::async_trait;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::FieldType;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
+use tokio_util::sync::CancellationToken;
 
 /// Drill that keeps on creating and deleting the same collections
 pub struct CollectionsChurn {
@@ -22,11 +22,11 @@ pub struct CollectionsChurn {
     collection_count: usize,
     point_count: usize,
     vec_dim: usize,
-    stopped: Arc<AtomicBool>,
+    stopped: CancellationToken,
 }
 
 impl CollectionsChurn {
-    pub fn new(stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: CancellationToken) -> Self {
         let base_collection_name = "collection-churn-drill_".to_string();
         let collection_count = 10;
         let point_count = 10000;
@@ -54,7 +54,7 @@ impl Drill for CollectionsChurn {
     async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
         // cleanup potential left-over previous collections
         for i in 0..self.collection_count {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             let collection_name = format!("{}{}", self.base_collection_name, i);
@@ -68,7 +68,7 @@ impl Drill for CollectionsChurn {
 
         // create new collections
         for i in 0..self.collection_count {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             let collection_name = format!("{}{}", self.base_collection_name, i);
@@ -103,7 +103,7 @@ impl Drill for CollectionsChurn {
 
         // delete new collections
         for i in 0..self.collection_count {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             let collection_name = format!("{}{}", self.base_collection_name, i);

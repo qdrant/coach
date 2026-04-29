@@ -19,9 +19,9 @@ use qdrant_client::qdrant::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
+use tokio_util::sync::CancellationToken;
 
 /// Get point by id
 pub async fn get_point_by_id(
@@ -369,12 +369,12 @@ pub async fn get_collection_status(
 pub async fn wait_index(
     client: &Qdrant,
     collection_name: &str,
-    stopped: Arc<AtomicBool>,
+    cancel: CancellationToken,
 ) -> Result<f64, CoachError> {
     let start = std::time::Instant::now();
     let mut seen = 0;
     loop {
-        if stopped.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Err(Cancelled);
         }
         sleep(Duration::from_secs(1)).await;
@@ -507,7 +507,7 @@ pub async fn insert_points_batch(
     vec_dim: usize,
     payload_count: usize,
     write_ordering: Option<WriteOrdering>,
-    stopped: Arc<AtomicBool>,
+    cancel: CancellationToken,
 ) -> Result<(), CoachError> {
     let cut_off_size = 100;
     // handle less than batch & spill over
@@ -549,7 +549,7 @@ pub async fn insert_points_batch(
             points.push(point_struct);
         }
 
-        if stopped.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Err(Cancelled);
         }
 

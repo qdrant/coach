@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
@@ -27,11 +27,11 @@ pub struct HighConcurrency {
     vec_dim: usize,
     payload_count: usize,
     write_ordering: Option<WriteOrdering>,
-    stopped: Arc<AtomicBool>,
+    stopped: CancellationToken,
 }
 
 impl HighConcurrency {
-    pub fn new(stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "high-concurrency".to_string();
         let concurrency_level = 400;
         let number_iterations = 40000;
@@ -153,7 +153,7 @@ impl Drill for HighConcurrency {
         // consume stream
         while let Some(result) = upsert_stream.next().await {
             // stop consuming stream on shutdown
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             // stop consuming stream on first error

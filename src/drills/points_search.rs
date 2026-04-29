@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
@@ -21,11 +21,11 @@ pub struct PointsSearch {
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
-    stopped: Arc<AtomicBool>,
+    stopped: CancellationToken,
 }
 
 impl PointsSearch {
-    pub fn new(stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "points-search-drill".to_string();
         let vec_dim = 128;
         let payload_count = 2;
@@ -85,7 +85,7 @@ impl Drill for PointsSearch {
 
         // search `search_count` times
         for _i in 0..self.search_count {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             let response = search_points(

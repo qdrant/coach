@@ -20,11 +20,11 @@ use log::warn;
 use qdrant_client::Qdrant;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
+use tokio_util::sync::CancellationToken;
 
 /// A drill is a single test that is run periodically
 #[async_trait]
@@ -45,19 +45,19 @@ struct DrillReport {
     error: Option<String>,
 }
 
-pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<JoinHandle<()>>> {
+pub async fn run_drills(args: Args, cancel: CancellationToken) -> Result<Vec<JoinHandle<()>>> {
     // all drills known to coach
     let all_drills: Vec<Box<dyn Drill>> = vec![
-        Box::new(CollectionsChurn::new(stopped.clone())),
-        Box::new(PointsSearch::new(stopped.clone())),
-        Box::new(PointsChurn::new(stopped.clone())),
-        Box::new(PointsUpdate::new(stopped.clone())),
-        Box::new(CollectionSnapshotsChurn::new(stopped.clone())),
-        Box::new(ToggleIndexing::new(stopped.clone())),
-        Box::new(HighConcurrency::new(stopped.clone())),
-        Box::new(LargeRetrieve::new(stopped.clone())),
-        Box::new(CollectionConcurrentLifecycle::new(stopped.clone())),
-        Box::new(PointsOptionalVectors::new(stopped.clone())),
+        Box::new(CollectionsChurn::new(cancel.clone())),
+        Box::new(PointsSearch::new(cancel.clone())),
+        Box::new(PointsChurn::new(cancel.clone())),
+        Box::new(PointsUpdate::new(cancel.clone())),
+        Box::new(CollectionSnapshotsChurn::new(cancel.clone())),
+        Box::new(ToggleIndexing::new(cancel.clone())),
+        Box::new(HighConcurrency::new(cancel.clone())),
+        Box::new(LargeRetrieve::new(cancel.clone())),
+        Box::new(CollectionConcurrentLifecycle::new(cancel.clone())),
+        Box::new(PointsOptionalVectors::new(cancel.clone())),
     ];
 
     // filter drills by name
@@ -109,7 +109,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     // run drills
     let mut drill_tasks = Vec::with_capacity(drills_to_run.len());
     for drill in drills_to_run {
-        let stopped = stopped.clone();
+        let cancel = cancel.clone();
         let drill_semaphore = max_drill_semaphore.clone();
         let args_arc = args_arc.clone();
         let drill_clients = drill_clients.clone();
@@ -129,7 +129,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                 );
                 if args_arc.stop_at_first_error {
                     info!("Stopping coach because stop_at_first_error is set");
-                    stopped.store(true, Ordering::Relaxed);
+                    cancel.cancel();
                 }
                 // stop drill
                 return;
@@ -146,7 +146,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                 // run drill against all uri sequentially
                 debug!("Starting {}", drill.name());
                 for uri in &args_arc.uris {
-                    if stopped.load(Ordering::Relaxed) {
+                    if cancel.is_cancelled() {
                         // stop drill
                         return;
                     }
@@ -180,7 +180,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                     };
                 }
 
-                if stopped.load(Ordering::Relaxed) {
+                if cancel.is_cancelled() {
                     // drill canceled
                     return;
                 }
@@ -200,7 +200,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                     // stop coach in case pf no successful run if configured
                     if args_arc.stop_at_first_error {
                         info!("Stopping coach because stop_at_first_error is set");
-                        stopped.store(true, Ordering::Relaxed);
+                        cancel.cancel();
                     }
                 } else if successful_runs == uris_len {
                     info!(
@@ -223,12 +223,9 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
 
                 // release semaphore while waiting for reschedule
                 drop(run_permit);
-                let reschedule_start = Instant::now();
-                while reschedule_start.elapsed().as_secs() < drill.reschedule_after_sec() {
-                    if stopped.load(Ordering::Relaxed) {
-                        break;
-                    }
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_secs(drill.reschedule_after_sec())) => {}
+                    _ = cancel.cancelled() => return,
                 }
             }
         });

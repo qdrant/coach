@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
@@ -20,11 +20,11 @@ pub struct LargeRetrieve {
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
-    stopped: Arc<AtomicBool>,
+    stopped: CancellationToken,
 }
 
 impl LargeRetrieve {
-    pub fn new(stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "large-retrieve-drill".to_string();
         let vec_dim = 1536;
         let payload_count = 2;
@@ -84,7 +84,7 @@ impl Drill for LargeRetrieve {
 
         // retrieve `retrieve_count` times
         for _i in 0..self.retrieve_count {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             let response = retrieve_points(client, &self.collection_name, &ids).await?;

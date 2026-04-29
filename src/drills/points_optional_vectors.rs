@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
@@ -22,11 +22,11 @@ pub struct PointsOptionalVectors {
     vec_dim: usize,
     payload_count: usize,
     write_ordering: Option<WriteOrdering>,
-    stopped: Arc<AtomicBool>,
+    stopped: CancellationToken,
 }
 
 impl PointsOptionalVectors {
-    pub fn new(stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "points-optional-vectors-drill".to_string();
         let vec_dim = 768;
         let payload_count = 2;
@@ -82,7 +82,7 @@ impl Drill for PointsOptionalVectors {
 
         // set payload on empty points
         for point_id in 1..self.points_count {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             set_payload(
@@ -97,7 +97,7 @@ impl Drill for PointsOptionalVectors {
 
         // set vectors (no additional payloads)
         for point_id in 1..self.points_count {
-            if self.stopped.load(Ordering::Relaxed) {
+            if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
             upsert_point_by_id(

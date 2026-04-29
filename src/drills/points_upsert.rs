@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
+use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
@@ -19,11 +19,11 @@ pub struct PointsUpdate {
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
-    stopped: Arc<AtomicBool>,
+    stopped: CancellationToken,
 }
 
 impl PointsUpdate {
-    pub fn new(stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "points-update-drill".to_string();
         let vec_dim = 128;
         let payload_count = 2;
