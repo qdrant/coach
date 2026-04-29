@@ -10,13 +10,22 @@ use args::Args;
 use clap::Parser;
 use env_logger::Target;
 use qdrant_client::config::QdrantConfig;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    let args = Arc::new(Args::parse());
     setup_logger();
+
+    // resolve the seed - pick a random one and log it if not provided so failures are reproducible
+    let seed = args.seed.unwrap_or_else(rand::random);
+    log::info!("Using random seed {seed}");
+    let master_rng = SmallRng::seed_from_u64(seed);
+
     let cancel = CancellationToken::new();
     let r = cancel.clone();
 
@@ -28,13 +37,13 @@ async fn main() -> anyhow::Result<()> {
 
     let mut handles = vec![];
 
-    // start healthcheck
+    // start healthcheck (no random use)
     let healthcheck_handles = run_healthcheck(args.clone(), cancel.clone()).await?;
     handles.extend(healthcheck_handles);
 
     if !args.only_healthcheck {
         // start drills
-        let drill_handles = run_drills(args, cancel).await?;
+        let drill_handles = run_drills(args, cancel, master_rng).await?;
         handles.extend(drill_handles);
     } else {
         log::info!("Only healthcheck is enabled, no drills will be executed");

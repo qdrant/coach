@@ -17,6 +17,7 @@ use qdrant_client::qdrant::{
     SearchPointsBuilder, SearchResponse, SetPayloadPointsBuilder, UpdateCollectionBuilder,
     UpsertPointsBuilder, VectorParams, VectorParamsMap, VectorsConfig, WriteOrdering,
 };
+use rand::rngs::SmallRng;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -47,6 +48,7 @@ pub async fn upsert_point_by_id(
     vec_dim: usize,
     keyword_variants: usize,
     write_ordering: Option<WriteOrdering>,
+    rng: &mut SmallRng,
 ) -> Result<(), CoachError> {
     let point_id_grpc: PointId = PointId {
         point_id_options: Some(PointIdOptions::Num(point_id)),
@@ -54,8 +56,8 @@ pub async fn upsert_point_by_id(
 
     let point_struct = PointStruct::new(
         point_id_grpc,
-        random_named_vector(DEFAULT_VECTOR_NAME.to_string(), vec_dim),
-        random_payload(Some(keyword_variants)),
+        random_named_vector(rng, DEFAULT_VECTOR_NAME.to_string(), vec_dim),
+        random_payload(rng, Some(keyword_variants)),
     );
 
     let points = vec![point_struct];
@@ -109,8 +111,9 @@ pub async fn set_payload(
     point_id: u64,
     keyword_variants: usize,
     write_ordering: Option<WriteOrdering>,
+    rng: &mut SmallRng,
 ) -> Result<(), anyhow::Error> {
-    let payload = random_payload(Some(keyword_variants));
+    let payload = random_payload(rng, Some(keyword_variants));
 
     let points_id_selector = vec![PointId {
         point_id_options: Some(PointIdOptions::Num(point_id)),
@@ -144,9 +147,10 @@ pub async fn search_points(
     collection_name: &str,
     vec_dim: usize,
     keyword_variants: usize,
+    rng: &mut SmallRng,
 ) -> Result<SearchResponse, anyhow::Error> {
-    let query_vector = random_vector(vec_dim);
-    let query_filter = random_filter(Some(keyword_variants));
+    let query_vector = random_vector(rng, vec_dim);
+    let query_filter = random_filter(rng, Some(keyword_variants));
 
     let mut builder = SearchPointsBuilder::new(collection_name, query_vector, 100)
         .vector_name(DEFAULT_VECTOR_NAME.to_string())
@@ -170,8 +174,9 @@ pub async fn scroll_points(
     client: &Qdrant,
     collection_name: &str,
     keyword_variants: usize,
+    rng: &mut SmallRng,
 ) -> Result<ScrollResponse, anyhow::Error> {
-    let query_filter = random_filter(Some(keyword_variants));
+    let query_filter = random_filter(rng, Some(keyword_variants));
 
     let mut builder = ScrollPointsBuilder::new(collection_name)
         .limit(100)
@@ -500,6 +505,7 @@ pub async fn recreate_collection(
 /// insert points into collection (blocking)
 /// vec_dim = 0 means no vectors
 /// keyword_variants = 0 means no payloads
+#[allow(clippy::too_many_arguments)]
 pub async fn insert_points_batch(
     client: &Qdrant,
     collection_name: &str,
@@ -508,6 +514,7 @@ pub async fn insert_points_batch(
     keyword_variants: usize,
     write_ordering: Option<WriteOrdering>,
     cancel: CancellationToken,
+    rng: &mut SmallRng,
 ) -> Result<(), CoachError> {
     let cut_off_size = 100;
     // handle less than batch & spill over
@@ -539,8 +546,8 @@ pub async fn insert_points_batch(
             };
 
             let vectors =
-                Some(random_named_vector(DEFAULT_VECTOR_NAME.to_string(), vec_dim).into());
-            let payload = random_payload(Some(keyword_variants)).into();
+                Some(random_named_vector(rng, DEFAULT_VECTOR_NAME.to_string(), vec_dim).into());
+            let payload = random_payload(rng, Some(keyword_variants)).into();
             let point_struct = PointStruct {
                 id: Some(point_id),
                 payload,

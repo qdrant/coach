@@ -67,4 +67,7 @@ pub struct Args {
     /// API key for the Qdrant client (read once from QDRANT_API_KEY at startup)
     #[arg(skip = std::env::var("QDRANT_API_KEY").ok())]
     pub api_key: Option<String>,
+    /// Seed for the random number generator. If not set, a random seed is picked and logged.
+    #[arg(long)]
+    pub seed: Option<u64>,
 }

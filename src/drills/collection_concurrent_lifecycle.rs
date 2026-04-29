@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rand::rngs::SmallRng;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
@@ -55,7 +56,12 @@ impl Drill for CollectionConcurrentLifecycle {
         10
     }
 
-    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(
+        &self,
+        client: &Qdrant,
+        args: Arc<Args>,
+        rng: &mut SmallRng,
+    ) -> Result<(), CoachError> {
         // delete if already exists
         if client.collection_exists(&self.collection_name).await? {
             delete_collection(client, &self.collection_name).await?;
@@ -116,6 +122,7 @@ impl Drill for CollectionConcurrentLifecycle {
             self.keyword_variants,
             None,
             self.stopped.clone(),
+            rng,
         )
         .await?;
 
@@ -204,7 +211,12 @@ impl Drill for CollectionConcurrentLifecycle {
         Ok(())
     }
 
-    async fn before_all(&self, _client: &Qdrant, _args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(
+        &self,
+        _client: &Qdrant,
+        _args: Arc<Args>,
+        _rng: &mut SmallRng,
+    ) -> Result<(), CoachError> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())

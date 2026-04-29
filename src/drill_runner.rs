@@ -18,6 +18,8 @@ use log::error;
 use log::info;
 use log::warn;
 use qdrant_client::Qdrant;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -34,9 +36,19 @@ pub trait Drill: Send + Sync {
     // delay between runs
     fn reschedule_after_sec(&self) -> u64;
     // run drill
-    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError>;
+    async fn run(
+        &self,
+        client: &Qdrant,
+        args: Arc<Args>,
+        rng: &mut SmallRng,
+    ) -> Result<(), CoachError>;
     // run before the first run
-    async fn before_all(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError>;
+    async fn before_all(
+        &self,
+        client: &Qdrant,
+        args: Arc<Args>,
+        rng: &mut SmallRng,
+    ) -> Result<(), CoachError>;
 }
 
 struct DrillReport {
@@ -45,7 +57,11 @@ struct DrillReport {
     error: Option<String>,
 }
 
-pub async fn run_drills(args: Args, cancel: CancellationToken) -> Result<Vec<JoinHandle<()>>> {
+pub async fn run_drills(
+    args: Arc<Args>,
+    cancel: CancellationToken,
+    mut master_rng: SmallRng,
+) -> Result<Vec<JoinHandle<()>>> {
     // all drills known to coach
     let all_drills: Vec<Box<dyn Drill>> = vec![
         Box::new(CollectionsChurn::new(cancel.clone())),
@@ -94,14 +110,13 @@ pub async fn run_drills(args: Args, cancel: CancellationToken) -> Result<Vec<Joi
     // control the max number of concurrent drills running
     let max_drill_semaphore = Arc::new(Semaphore::new(args.parallel_drills));
     let uris_len = args.uris.len();
-    let args_arc = Arc::new(args);
     // build one client per URI, shared across all drills
     let mut drill_clients: HashMap<String, Qdrant> = HashMap::with_capacity(uris_len);
-    for uri in &args_arc.uris {
+    for uri in &args.uris {
         let client = Qdrant::new(get_config(
             uri,
-            args_arc.grpc_timeout_ms,
-            args_arc.api_key.as_deref(),
+            args.grpc_timeout_ms,
+            args.api_key.as_deref(),
         ))?;
         drill_clients.insert(uri.clone(), client);
     }
@@ -111,23 +126,30 @@ pub async fn run_drills(args: Args, cancel: CancellationToken) -> Result<Vec<Joi
     for drill in drills_to_run {
         let cancel = cancel.clone();
         let drill_semaphore = max_drill_semaphore.clone();
-        let args_arc = args_arc.clone();
+        let args = args.clone();
         let drill_clients = drill_clients.clone();
+        // fork a per-drill rng from the master so each drill has an independent,
+        // deterministic stream - the master is consumed sequentially here
+        let mut drill_rng = SmallRng::from_rng(&mut master_rng);
 
         let task = tokio::spawn(async move {
-            // before drill - run against the first uri
-            let before_uri = args_arc.uris.first().expect("Not empty per construction");
+            // run before_all against any single URI - all URIs are nodes of the same
+            // cluster, so collection creation/setup propagates across nodes and must
+            // not be repeated per node
+            let before_uri = args.uris.first().expect("Not empty per construction");
             let before_client = drill_clients
                 .get(before_uri)
                 .expect("client built for every uri");
-            let before_res = drill.before_all(before_client, args_arc.clone()).await;
+            let before_res = drill
+                .before_all(before_client, args.clone(), &mut drill_rng)
+                .await;
             if let Err(e) = before_res {
                 error!(
                     "Drill {} failed to run before_all caused by {}",
                     drill.name(),
                     e
                 );
-                if args_arc.stop_at_first_error {
+                if args.stop_at_first_error {
                     info!("Stopping coach because stop_at_first_error is set");
                     cancel.cancel();
                 }
@@ -145,14 +167,14 @@ pub async fn run_drills(args: Args, cancel: CancellationToken) -> Result<Vec<Joi
                 let mut drill_reports = Vec::with_capacity(uris_len);
                 // run drill against all uri sequentially
                 debug!("Starting {}", drill.name());
-                for uri in &args_arc.uris {
+                for uri in &args.uris {
                     if cancel.is_cancelled() {
                         // stop drill
                         return;
                     }
                     let drill_client = drill_clients.get(uri).expect("client built for every uri");
                     let execution_start = Instant::now();
-                    let result = drill.run(drill_client, args_arc.clone()).await;
+                    let result = drill.run(drill_client, args.clone(), &mut drill_rng).await;
                     match result {
                         Ok(_) => {
                             if let Some(_prev) = last_errors.remove(uri) {
@@ -198,7 +220,7 @@ pub async fn run_drills(args: Args, cancel: CancellationToken) -> Result<Vec<Joi
                     }
                     error!("{display_report}");
                     // stop coach in case pf no successful run if configured
-                    if args_arc.stop_at_first_error {
+                    if args.stop_at_first_error {
                         info!("Stopping coach because stop_at_first_error is set");
                         cancel.cancel();
                     }

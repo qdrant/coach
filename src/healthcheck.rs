@@ -6,12 +6,16 @@ use hdrhistogram::Histogram;
 use log::error;
 use log::info;
 use qdrant_client::Qdrant;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
-pub async fn run_healthcheck(args: Args, cancel: CancellationToken) -> Result<Vec<JoinHandle<()>>> {
+pub async fn run_healthcheck(
+    args: Arc<Args>,
+    cancel: CancellationToken,
+) -> Result<Vec<JoinHandle<()>>> {
     // build one client per URI up front - propagate config errors before spawning
     // use 1 minute as upper bound timeout for client healthcheck
     let mut clients: Vec<(String, Qdrant)> = Vec::with_capacity(args.uris.len());

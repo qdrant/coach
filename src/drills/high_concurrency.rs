@@ -16,6 +16,8 @@ use futures::StreamExt;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::WriteOrdering;
 use rand::RngExt;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 
 /// Drill that performs operations on a collection with a high level of concurrency (without indexing).
 /// Run `concurrency_level` workers which repeatedly call APIs for inserting -> searching -> set payload -> updating -> getting one -> deleting
@@ -49,7 +51,12 @@ impl HighConcurrency {
         }
     }
 
-    async fn run_for_point(&self, client: &Qdrant, point_id: u64) -> Result<(), CoachError> {
+    async fn run_for_point(
+        &self,
+        client: &Qdrant,
+        point_id: u64,
+        mut rng: SmallRng,
+    ) -> Result<(), CoachError> {
         // insert single point
         upsert_point_by_id(
             client,
@@ -58,6 +65,7 @@ impl HighConcurrency {
             self.vec_dim,
             self.keyword_variants,
             self.write_ordering,
+            &mut rng,
         )
         .await?;
 
@@ -67,6 +75,7 @@ impl HighConcurrency {
             &self.collection_name,
             self.vec_dim,
             self.keyword_variants,
+            &mut rng,
         )
         .await?;
 
@@ -77,6 +86,7 @@ impl HighConcurrency {
             point_id,
             self.keyword_variants,
             self.write_ordering,
+            &mut rng,
         )
         .await?;
 
@@ -88,6 +98,7 @@ impl HighConcurrency {
             self.vec_dim,
             self.keyword_variants,
             self.write_ordering,
+            &mut rng,
         )
         .await?;
 
@@ -106,8 +117,8 @@ impl HighConcurrency {
         Ok(())
     }
 
-    fn pick_random<'a>(&self, clients: &'a [Qdrant]) -> &'a Qdrant {
-        let index = rand::rng().random_range(0..clients.len());
+    fn pick_random<'a>(&self, clients: &'a [Qdrant], rng: &mut SmallRng) -> &'a Qdrant {
+        let index = rng.random_range(0..clients.len());
         &clients[index]
     }
 }
@@ -122,7 +133,12 @@ impl Drill for HighConcurrency {
         10
     }
 
-    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(
+        &self,
+        client: &Qdrant,
+        args: Arc<Args>,
+        rng: &mut SmallRng,
+    ) -> Result<(), CoachError> {
         // delete if already exists
         if client.collection_exists(&self.collection_name).await? {
             delete_collection(client, &self.collection_name).await?;
@@ -142,9 +158,13 @@ impl Drill for HighConcurrency {
             target_clients.push(target_client);
         }
 
-        // lazy stream of futures
-        let query_stream = (0..self.number_iterations)
-            .map(|n| self.run_for_point(self.pick_random(&target_clients), n as u64));
+        // lazy stream of futures - fork a per-future rng from the drill rng so concurrent
+        // ops don't share state and stay deterministic per seed
+        let query_stream = (0..self.number_iterations).map(|n| {
+            let target = self.pick_random(&target_clients, rng);
+            let future_rng = SmallRng::from_rng(rng);
+            self.run_for_point(target, n as u64, future_rng)
+        });
 
         // at most self.concurrency_level futures will be running at the same time
         let mut upsert_stream =
@@ -175,7 +195,12 @@ impl Drill for HighConcurrency {
         Ok(())
     }
 
-    async fn before_all(&self, _client: &Qdrant, _args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(
+        &self,
+        _client: &Qdrant,
+        _args: Arc<Args>,
+        _rng: &mut SmallRng,
+    ) -> Result<(), CoachError> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())

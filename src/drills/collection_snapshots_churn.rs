@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rand::rngs::SmallRng;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
@@ -50,7 +51,12 @@ impl Drill for CollectionSnapshotsChurn {
         10
     }
 
-    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(
+        &self,
+        client: &Qdrant,
+        args: Arc<Args>,
+        rng: &mut SmallRng,
+    ) -> Result<(), CoachError> {
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
             // create collection
@@ -68,6 +74,7 @@ impl Drill for CollectionSnapshotsChurn {
                 self.keyword_variants,
                 None,
                 self.stopped.clone(),
+                rng,
             )
             .await?;
         }
@@ -129,7 +136,12 @@ impl Drill for CollectionSnapshotsChurn {
         Ok(())
     }
 
-    async fn before_all(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(
+        &self,
+        client: &Qdrant,
+        args: Arc<Args>,
+        rng: &mut SmallRng,
+    ) -> Result<(), CoachError> {
         // honor args.recreate_collection
         if args.recreate_collection {
             recreate_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
@@ -146,6 +158,7 @@ impl Drill for CollectionSnapshotsChurn {
                 self.keyword_variants,
                 None,
                 self.stopped.clone(),
+                rng,
             )
             .await?;
         }

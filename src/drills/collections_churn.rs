@@ -11,6 +11,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::FieldType;
+use rand::rngs::SmallRng;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
@@ -20,6 +21,7 @@ pub struct CollectionsChurn {
     collection_count: usize,
     point_count: usize,
     vec_dim: usize,
+    keyword_variants: usize,
     stopped: CancellationToken,
 }
 
@@ -29,11 +31,13 @@ impl CollectionsChurn {
         let collection_count = 10;
         let point_count = 10000;
         let vec_dim = 512;
+        let keyword_variants = 2;
         CollectionsChurn {
             base_collection_name,
             collection_count,
             point_count,
             vec_dim,
+            keyword_variants,
             stopped,
         }
     }
@@ -49,7 +53,12 @@ impl Drill for CollectionsChurn {
         10
     }
 
-    async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CoachError> {
+    async fn run(
+        &self,
+        client: &Qdrant,
+        args: Arc<Args>,
+        rng: &mut SmallRng,
+    ) -> Result<(), CoachError> {
         // cleanup potential left-over previous collections
         for i in 0..self.collection_count {
             if self.stopped.is_cancelled() {
@@ -76,9 +85,10 @@ impl Drill for CollectionsChurn {
                 &collection_name,
                 self.point_count,
                 self.vec_dim,
-                2,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
+                rng,
             )
             .await?;
             create_field_index(
@@ -121,7 +131,12 @@ impl Drill for CollectionsChurn {
         Ok(())
     }
 
-    async fn before_all(&self, _client: &Qdrant, _args: Arc<Args>) -> Result<(), CoachError> {
+    async fn before_all(
+        &self,
+        _client: &Qdrant,
+        _args: Arc<Args>,
+        _rng: &mut SmallRng,
+    ) -> Result<(), CoachError> {
         // no need to explicitly honor args.recreate_collection
         // because we are going to delete the collection anyway
         Ok(())
