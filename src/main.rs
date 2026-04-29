@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
 
     // resolve the seed - pick a random one and log it if not provided so failures are reproducible
     let seed = args.seed.unwrap_or_else(rand::random);
-    log::info!("Using random seed {seed}");
+    log::info!("Using seed {seed} (pass --seed {seed} to reproduce)");
     let master_rng = SmallRng::seed_from_u64(seed);
 
     let cancel = CancellationToken::new();
