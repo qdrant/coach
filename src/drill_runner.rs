@@ -95,21 +95,28 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     let max_drill_semaphore = Arc::new(Semaphore::new(args.parallel_drills));
     let uris_len = args.uris.len();
     let args_arc = Arc::new(args);
-    let first_uri = &args_arc.uris.first().expect("Not empty per construction");
-    let before_client = Qdrant::new(get_config(first_uri, args_arc.grpc_timeout_ms))?;
-    // pick first uri to run before_all
-    let before_client_arc = Arc::new(before_client);
+    // build one client per URI, shared across all drills
+    let mut drill_clients: HashMap<String, Qdrant> = HashMap::with_capacity(uris_len);
+    for uri in &args_arc.uris {
+        let client = Qdrant::new(get_config(uri, args_arc.grpc_timeout_ms))?;
+        drill_clients.insert(uri.clone(), client);
+    }
+    let drill_clients = Arc::new(drill_clients);
     // run drills
     let mut drill_tasks = Vec::with_capacity(drills_to_run.len());
     for drill in drills_to_run {
         let stopped = stopped.clone();
         let drill_semaphore = max_drill_semaphore.clone();
         let args_arc = args_arc.clone();
-        let before_client_arc = before_client_arc.clone();
+        let drill_clients = drill_clients.clone();
 
         let task = tokio::spawn(async move {
-            // before drill
-            let before_res = drill.before_all(&before_client_arc, args_arc.clone()).await;
+            // before drill - run against the first uri
+            let before_uri = args_arc.uris.first().expect("Not empty per construction");
+            let before_client = drill_clients
+                .get(before_uri)
+                .expect("client built for every uri");
+            let before_res = drill.before_all(before_client, args_arc.clone()).await;
             if let Err(e) = before_res {
                 error!(
                     "Drill {} failed to run before_all caused by {}",
@@ -139,10 +146,9 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                         // stop drill
                         return;
                     }
-                    let drill_client =
-                        Qdrant::new(get_config(uri, args_arc.grpc_timeout_ms)).unwrap();
+                    let drill_client = drill_clients.get(uri).expect("client built for every uri");
                     let execution_start = Instant::now();
-                    let result = drill.run(&drill_client, args_arc.clone()).await;
+                    let result = drill.run(drill_client, args_arc.clone()).await;
                     match result {
                         Ok(_) => {
                             if let Some(_prev) = last_errors.remove(uri) {
@@ -160,14 +166,11 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
                                 duration: execution_start.elapsed(),
                                 error: Some(e.to_string()),
                             });
-                            // do not spam logs with the same error
-                            if let Some(_prev_error) = last_errors.get(uri) {
-                                last_errors.insert(uri.to_string(), e);
-                            } else {
-                                // print warning the first time
+                            // do not spam logs with the same error - warn the first time
+                            if !last_errors.contains_key(uri) {
                                 warn!("{} started to fail for {} with {}", drill.name(), uri, e);
-                                last_errors.insert(uri.to_string(), e);
                             }
+                            last_errors.insert(uri.to_string(), e);
                         }
                         Err(CoachError::Cancelled) => (),
                     };

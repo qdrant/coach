@@ -22,14 +22,14 @@ pub async fn run_healthcheck(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec
             let client_config = get_config(&uri, 60 * 1000);
             // validate timeout manually
             let max_healthcheck_timeout_ms = args.grpc_health_check_timeout_ms as u64;
-            let client = Qdrant::new(client_config);
             // fails only if the configuration is invalid
-            if let Err(e) = client {
-                error!("Failed to create healthcheck client for {uri}: {e}");
-                return;
-            }
-            // safe unwrap
-            let client = client.unwrap();
+            let client = match Qdrant::new(client_config) {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("Failed to create healthcheck client for {uri}: {e}");
+                    return;
+                }
+            };
             let health_check_delay_ms = Duration::from_millis(args.health_check_delay_ms as u64);
             // record errors for deduplication
             let mut last_error: Option<anyhow::Error> = None;
