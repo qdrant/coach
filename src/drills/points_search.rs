@@ -44,8 +44,8 @@ impl PointsSearch {
 
 #[async_trait]
 impl Drill for PointsSearch {
-    fn name(&self) -> String {
-        "points_search".to_string()
+    fn name(&self) -> &'static str {
+        "points_search"
     }
 
     fn reschedule_after_sec(&self) -> u64 {

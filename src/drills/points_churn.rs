@@ -41,8 +41,8 @@ impl PointsChurn {
 
 #[async_trait]
 impl Drill for PointsChurn {
-    fn name(&self) -> String {
-        "points_churn".to_string()
+    fn name(&self) -> &'static str {
+        "points_churn"
     }
 
     fn reschedule_after_sec(&self) -> u64 {

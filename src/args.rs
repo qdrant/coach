@@ -64,4 +64,7 @@ pub struct Args {
     /// Timeout of gRPC health client
     #[arg(long, default_value_t = 50)]
     pub grpc_health_check_timeout_ms: usize,
+    /// API key for the Qdrant client (read once from QDRANT_API_KEY at startup)
+    #[arg(skip = std::env::var("QDRANT_API_KEY").ok())]
+    pub api_key: Option<String>,
 }

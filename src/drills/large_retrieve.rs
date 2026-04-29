@@ -43,8 +43,8 @@ impl LargeRetrieve {
 
 #[async_trait]
 impl Drill for LargeRetrieve {
-    fn name(&self) -> String {
-        "large_retrieve".to_string()
+    fn name(&self) -> &'static str {
+        "large_retrieve"
     }
 
     fn reschedule_after_sec(&self) -> u64 {

@@ -40,8 +40,8 @@ impl PointsUpdate {
 
 #[async_trait]
 impl Drill for PointsUpdate {
-    fn name(&self) -> String {
-        "points_update".to_string()
+    fn name(&self) -> &'static str {
+        "points_update"
     }
 
     fn reschedule_after_sec(&self) -> u64 {

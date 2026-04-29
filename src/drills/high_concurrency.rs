@@ -114,8 +114,8 @@ impl HighConcurrency {
 
 #[async_trait]
 impl Drill for HighConcurrency {
-    fn name(&self) -> String {
-        "high_concurrency".to_string()
+    fn name(&self) -> &'static str {
+        "high_concurrency"
     }
 
     fn reschedule_after_sec(&self) -> u64 {
@@ -134,7 +134,11 @@ impl Drill for HighConcurrency {
         // workers will target random clients for all nodes to stress the cluster
         let mut target_clients = vec![];
         for uri in &args.uris {
-            let target_client = Qdrant::new(get_config(uri, args.grpc_timeout_ms))?;
+            let target_client = Qdrant::new(get_config(
+                uri,
+                args.grpc_timeout_ms,
+                args.api_key.as_deref(),
+            ))?;
             target_clients.push(target_client);
         }
 

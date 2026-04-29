@@ -30,7 +30,7 @@ use tokio::time::Instant;
 #[async_trait]
 pub trait Drill: Send + Sync {
     // name of the drill
-    fn name(&self) -> String;
+    fn name(&self) -> &'static str;
     // delay between runs
     fn reschedule_after_sec(&self) -> u64;
     // run drill
@@ -64,12 +64,12 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     let drills_to_run = if !args.drills_to_run.is_empty() {
         all_drills
             .into_iter()
-            .filter(|d| args.drills_to_run.contains(&d.name()))
+            .filter(|d| args.drills_to_run.iter().any(|n| n == d.name()))
             .collect::<Vec<_>>()
     } else {
         all_drills
             .into_iter()
-            .filter(|d| !args.ignored_drills.contains(&d.name()))
+            .filter(|d| !args.ignored_drills.iter().any(|n| n == d.name()))
             .collect::<Vec<_>>()
     };
 
@@ -98,7 +98,11 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
     // build one client per URI, shared across all drills
     let mut drill_clients: HashMap<String, Qdrant> = HashMap::with_capacity(uris_len);
     for uri in &args_arc.uris {
-        let client = Qdrant::new(get_config(uri, args_arc.grpc_timeout_ms))?;
+        let client = Qdrant::new(get_config(
+            uri,
+            args_arc.grpc_timeout_ms,
+            args_arc.api_key.as_deref(),
+        ))?;
         drill_clients.insert(uri.clone(), client);
     }
     let drill_clients = Arc::new(drill_clients);
@@ -138,7 +142,7 @@ pub async fn run_drills(args: Args, stopped: Arc<AtomicBool>) -> Result<Vec<Join
             loop {
                 // acquire semaphore to run
                 let run_permit = drill_semaphore.acquire().await.unwrap();
-                let mut drill_reports = vec![];
+                let mut drill_reports = Vec::with_capacity(uris_len);
                 // run drill against all uri sequentially
                 debug!("Starting {}", drill.name());
                 for uri in &args_arc.uris {

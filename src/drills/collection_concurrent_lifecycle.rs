@@ -47,8 +47,8 @@ impl CollectionConcurrentLifecycle {
 
 #[async_trait]
 impl Drill for CollectionConcurrentLifecycle {
-    fn name(&self) -> String {
-        "collection_concurrent_lifecycle".to_string()
+    fn name(&self) -> &'static str {
+        "collection_concurrent_lifecycle"
     }
 
     fn reschedule_after_sec(&self) -> u64 {

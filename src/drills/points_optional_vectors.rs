@@ -45,8 +45,8 @@ impl PointsOptionalVectors {
 
 #[async_trait]
 impl Drill for PointsOptionalVectors {
-    fn name(&self) -> String {
-        "points_optional_vectors".to_string()
+    fn name(&self) -> &'static str {
+        "points_optional_vectors"
     }
 
     fn reschedule_after_sec(&self) -> u64 {

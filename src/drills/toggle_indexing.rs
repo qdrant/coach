@@ -45,8 +45,8 @@ impl ToggleIndexing {
 
 #[async_trait]
 impl Drill for ToggleIndexing {
-    fn name(&self) -> String {
-        "toggle_indexing".to_string()
+    fn name(&self) -> &'static str {
+        "toggle_indexing"
     }
 
     fn reschedule_after_sec(&self) -> u64 {

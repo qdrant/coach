@@ -43,8 +43,8 @@ impl CollectionsChurn {
 
 #[async_trait]
 impl Drill for CollectionsChurn {
-    fn name(&self) -> String {
-        "collections_churn".to_string()
+    fn name(&self) -> &'static str {
+        "collections_churn"
     }
 
     fn reschedule_after_sec(&self) -> u64 {
