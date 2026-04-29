@@ -45,7 +45,7 @@ pub async fn upsert_point_by_id(
     collection_name: &str,
     point_id: u64,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     write_ordering: Option<WriteOrdering>,
 ) -> Result<(), CoachError> {
     let point_id_grpc: PointId = PointId {
@@ -55,7 +55,7 @@ pub async fn upsert_point_by_id(
     let point_struct = PointStruct::new(
         point_id_grpc,
         random_named_vector(DEFAULT_VECTOR_NAME.to_string(), vec_dim),
-        random_payload(Some(payload_count)),
+        random_payload(Some(keyword_variants)),
     );
 
     let points = vec![point_struct];
@@ -107,10 +107,10 @@ pub async fn set_payload(
     client: &Qdrant,
     collection_name: &str,
     point_id: u64,
-    payload_count: usize,
+    keyword_variants: usize,
     write_ordering: Option<WriteOrdering>,
 ) -> Result<(), anyhow::Error> {
-    let payload = random_payload(Some(payload_count));
+    let payload = random_payload(Some(keyword_variants));
 
     let points_id_selector = vec![PointId {
         point_id_options: Some(PointIdOptions::Num(point_id)),
@@ -125,7 +125,7 @@ pub async fn set_payload(
     }
 
     let resp = client.set_payload(builder).await.context(format!(
-        "Failed to set payload for {point_id} with payload_count {payload_count}"
+        "Failed to set payload for {point_id} with keyword_variants {keyword_variants}"
     ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
@@ -143,10 +143,10 @@ pub async fn search_points(
     client: &Qdrant,
     collection_name: &str,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
 ) -> Result<SearchResponse, anyhow::Error> {
     let query_vector = random_vector(vec_dim);
-    let query_filter = random_filter(Some(payload_count));
+    let query_filter = random_filter(Some(keyword_variants));
 
     let mut builder = SearchPointsBuilder::new(collection_name, query_vector, 100)
         .vector_name(DEFAULT_VECTOR_NAME.to_string())
@@ -169,9 +169,9 @@ pub async fn search_points(
 pub async fn scroll_points(
     client: &Qdrant,
     collection_name: &str,
-    payload_count: usize,
+    keyword_variants: usize,
 ) -> Result<ScrollResponse, anyhow::Error> {
-    let query_filter = random_filter(Some(payload_count));
+    let query_filter = random_filter(Some(keyword_variants));
 
     let mut builder = ScrollPointsBuilder::new(collection_name)
         .limit(100)
@@ -499,13 +499,13 @@ pub async fn recreate_collection(
 
 /// insert points into collection (blocking)
 /// vec_dim = 0 means no vectors
-/// payload_count = 0 means no payloads
+/// keyword_variants = 0 means no payloads
 pub async fn insert_points_batch(
     client: &Qdrant,
     collection_name: &str,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     write_ordering: Option<WriteOrdering>,
     cancel: CancellationToken,
 ) -> Result<(), CoachError> {
@@ -540,7 +540,7 @@ pub async fn insert_points_batch(
 
             let vectors =
                 Some(random_named_vector(DEFAULT_VECTOR_NAME.to_string(), vec_dim).into());
-            let payload = random_payload(Some(payload_count)).into();
+            let payload = random_payload(Some(keyword_variants)).into();
             let point_struct = PointStruct {
                 id: Some(point_id),
                 payload,
@@ -639,7 +639,7 @@ pub async fn create_field_index(
     client
         .create_field_index(
             CreateFieldIndexCollectionBuilder::new(collection_name, field_name, field_type)
-                .wait(false),
+                .wait(true),
         )
         .await
         .context(format!(

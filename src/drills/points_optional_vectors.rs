@@ -4,7 +4,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, get_points_count, insert_points_batch, recreate_collection,
+    create_collection, get_points_count, insert_points_batch, recreate_collection, retrieve_points,
     set_indexing_threshold, set_payload, upsert_point_by_id, wait_index,
 };
 use crate::common::coach_errors::CoachError;
@@ -20,7 +20,7 @@ pub struct PointsOptionalVectors {
     collection_name: String,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     write_ordering: Option<WriteOrdering>,
     stopped: CancellationToken,
 }
@@ -29,14 +29,14 @@ impl PointsOptionalVectors {
     pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "points-optional-vectors-drill".to_string();
         let vec_dim = 768;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let points_count = 20000;
         let write_ordering = None; // default
         PointsOptionalVectors {
             collection_name,
             points_count,
             vec_dim,
-            payload_count,
+            keyword_variants,
             write_ordering,
             stopped,
         }
@@ -81,7 +81,7 @@ impl Drill for PointsOptionalVectors {
         .await?;
 
         // set payload on empty points
-        for point_id in 1..self.points_count {
+        for point_id in 0..self.points_count {
             if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
@@ -89,14 +89,14 @@ impl Drill for PointsOptionalVectors {
                 client,
                 &self.collection_name,
                 point_id as u64,
-                self.payload_count,
+                self.keyword_variants,
                 self.write_ordering,
             )
             .await?;
         }
 
         // set vectors (no additional payloads)
-        for point_id in 1..self.points_count {
+        for point_id in 0..self.points_count {
             if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
@@ -121,6 +121,18 @@ impl Drill for PointsOptionalVectors {
                 "Collection has wrong number of points after insert {} vs {}",
                 points_count, self.points_count
             )));
+        }
+
+        // sample point 0 - must have vectors set after the upsert phase (payload is
+        // not checked because the empty-payload upsert in phase 3 may overwrite it)
+        let sample = retrieve_points(client, &self.collection_name, &[0]).await?;
+        let point = sample.result.first().ok_or_else(|| {
+            Invariant("Sample point 0 missing after payload+vector phases".to_string())
+        })?;
+        if point.vectors.is_none() {
+            return Err(Invariant(
+                "Sample point 0 has no vectors after upsert phase".to_string(),
+            ));
         }
 
         Ok(())

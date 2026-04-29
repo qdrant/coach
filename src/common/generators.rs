@@ -14,17 +14,17 @@ pub fn random_keyword(num_variants: usize) -> String {
     format!("keyword_{variant}")
 }
 
-pub fn random_payload(keywords: Option<usize>) -> Payload {
+pub fn random_payload(keyword_variants: Option<usize>) -> Payload {
     let mut payload = Payload::new();
-    if let Some(keyword_variants) = keywords
-        && keyword_variants > 0
+    if let Some(n) = keyword_variants
+        && n > 0
     {
-        payload.insert(KEYWORD_PAYLOAD_KEY, random_keyword(keyword_variants));
+        payload.insert(KEYWORD_PAYLOAD_KEY, random_keyword(n));
     }
     payload
 }
 
-pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
+pub fn random_filter(keyword_variants: Option<usize>) -> Option<Filter> {
     let mut filter = Filter {
         should: vec![],
         must: vec![],
@@ -32,11 +32,11 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
         min_should: None,
     };
     let mut have_any = false;
-    if let Some(keyword_variants) = keywords {
+    if let Some(n) = keyword_variants {
         have_any = true;
         filter.must.push(Condition::matches(
             KEYWORD_PAYLOAD_KEY.to_string(),
-            MatchValue::Keyword(random_keyword(keyword_variants)),
+            MatchValue::Keyword(random_keyword(n)),
         ))
     }
     if have_any { Some(filter) } else { None }

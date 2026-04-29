@@ -23,7 +23,7 @@ pub struct CollectionConcurrentLifecycle {
     stopped: CancellationToken,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     parallelism: usize,
 }
 
@@ -31,14 +31,14 @@ impl CollectionConcurrentLifecycle {
     pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "collection-concurrent-lifecycle-drill".to_string();
         let vec_dim = 512;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let points_count = 50000;
         let parallelism = 20;
         CollectionConcurrentLifecycle {
             collection_name,
             points_count,
             vec_dim,
-            payload_count,
+            keyword_variants,
             stopped,
             parallelism,
         }
@@ -113,7 +113,7 @@ impl Drill for CollectionConcurrentLifecycle {
             &self.collection_name,
             self.points_count,
             self.vec_dim,
-            self.payload_count,
+            self.keyword_variants,
             None,
             self.stopped.clone(),
         )
@@ -159,7 +159,9 @@ impl Drill for CollectionConcurrentLifecycle {
             if self.stopped.is_cancelled() {
                 return Err(Cancelled);
             }
-            // make sure the collection does not exist (do not care about this result)
+            // reset state at the start of each round so the create/delete race below
+            // always starts from "collection does not exist" - otherwise residue from
+            // the previous round skews which side wins
             let _clean = delete_collection(client, &self.collection_name).await?;
             // race between 1 creation and 1 deletion
             tokio::select! {
@@ -191,6 +193,12 @@ impl Drill for CollectionConcurrentLifecycle {
                 },
                 else => break,
             }
+        }
+
+        // final state is unpredictable - either side could have won the last race -
+        // so just clean up unconditionally for the next iteration
+        if client.collection_exists(&self.collection_name).await? {
+            delete_collection(client, &self.collection_name).await?;
         }
 
         Ok(())

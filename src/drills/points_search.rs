@@ -5,7 +5,7 @@ use tokio_util::sync::CancellationToken;
 use crate::args::Args;
 use crate::common::client::{
     create_collection, get_points_count, insert_points_batch, recreate_collection, search_points,
-    wait_index,
+    upsert_point_by_id, wait_index,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::{Cancelled, Invariant};
@@ -20,7 +20,7 @@ pub struct PointsSearch {
     search_count: usize,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     stopped: CancellationToken,
 }
 
@@ -28,7 +28,7 @@ impl PointsSearch {
     pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "points-search-drill".to_string();
         let vec_dim = 128;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let search_count = 1000;
         let points_count = 10000;
         PointsSearch {
@@ -36,7 +36,7 @@ impl PointsSearch {
             search_count,
             points_count,
             vec_dim,
-            payload_count,
+            keyword_variants,
             stopped,
         }
     }
@@ -64,9 +64,26 @@ impl Drill for PointsSearch {
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
+            )
+            .await?;
+        }
+
+        // refresh a slice of points each run with fresh random data so searches
+        // exercise different content over time, not the same dataset on every iteration
+        for point_id in 0..100u64 {
+            if self.stopped.is_cancelled() {
+                return Err(Cancelled);
+            }
+            upsert_point_by_id(
+                client,
+                &self.collection_name,
+                point_id,
+                self.vec_dim,
+                self.keyword_variants,
+                None,
             )
             .await?;
         }
@@ -92,12 +109,32 @@ impl Drill for PointsSearch {
                 client,
                 &self.collection_name,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
             )
             .await?;
             // assert not empty
             if response.result.is_empty() {
                 return Err(Invariant("Search returned empty result".to_string()));
+            }
+            // verify result content - top hit must have a valid id within the inserted range
+            // and payload (search_points requests with_payload)
+            let top = &response.result[0];
+            if top.payload.is_empty() {
+                return Err(Invariant("Search top hit has empty payload".to_string()));
+            }
+            let id = top.id.as_ref().and_then(|i| match i.point_id_options {
+                Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(n)) => Some(n),
+                _ => None,
+            });
+            match id {
+                Some(n) if (n as usize) < self.points_count => {}
+                Some(n) => {
+                    return Err(Invariant(format!(
+                        "Search returned out-of-range point id {n} (max {})",
+                        self.points_count
+                    )));
+                }
+                None => return Err(Invariant("Search top hit missing numeric id".to_string())),
             }
         }
 
@@ -114,7 +151,7 @@ impl Drill for PointsSearch {
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
             )

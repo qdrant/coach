@@ -4,8 +4,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_collection, delete_point_by_id, get_point_by_id, search_points,
-    set_payload, upsert_point_by_id,
+    create_collection, delete_collection, delete_point_by_id, get_point_by_id, get_points_count,
+    search_points, set_payload, upsert_point_by_id,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Cancelled;
@@ -25,7 +25,7 @@ pub struct HighConcurrency {
     concurrency_level: usize,
     number_iterations: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     write_ordering: Option<WriteOrdering>,
     stopped: CancellationToken,
 }
@@ -36,14 +36,14 @@ impl HighConcurrency {
         let concurrency_level = 400;
         let number_iterations = 40000;
         let vec_dim = 128;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let write_ordering = None; // default
         HighConcurrency {
             collection_name,
             concurrency_level,
             number_iterations,
             vec_dim,
-            payload_count,
+            keyword_variants,
             write_ordering,
             stopped,
         }
@@ -56,7 +56,7 @@ impl HighConcurrency {
             &self.collection_name,
             point_id,
             self.vec_dim,
-            self.payload_count,
+            self.keyword_variants,
             self.write_ordering,
         )
         .await?;
@@ -66,7 +66,7 @@ impl HighConcurrency {
             client,
             &self.collection_name,
             self.vec_dim,
-            self.payload_count,
+            self.keyword_variants,
         )
         .await?;
 
@@ -75,7 +75,7 @@ impl HighConcurrency {
             client,
             &self.collection_name,
             point_id,
-            self.payload_count,
+            self.keyword_variants,
             self.write_ordering,
         )
         .await?;
@@ -86,7 +86,7 @@ impl HighConcurrency {
             &self.collection_name,
             point_id,
             self.vec_dim,
-            self.payload_count,
+            self.keyword_variants,
             self.write_ordering,
         )
         .await?;
@@ -158,6 +158,15 @@ impl Drill for HighConcurrency {
             }
             // stop consuming stream on first error
             result?;
+        }
+
+        // every iteration inserts and deletes its own point - collection must be empty
+        let remaining = get_points_count(client, &self.collection_name).await?;
+        if remaining != 0 {
+            return Err(CoachError::Invariant(format!(
+                "{} has {} leftover points after concurrent insert/delete cycles",
+                self.collection_name, remaining
+            )));
         }
 
         // delete collection to not accumulate data over time

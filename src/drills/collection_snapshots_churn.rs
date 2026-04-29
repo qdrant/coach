@@ -6,7 +6,7 @@ use crate::args::Args;
 use crate::common::client::{
     count_collection_snapshots, create_collection, create_collection_snapshot,
     delete_collection_snapshot, disable_indexing, get_points_count, insert_points_batch,
-    recreate_collection,
+    list_collection_snapshots, recreate_collection,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Invariant;
@@ -20,7 +20,7 @@ pub struct CollectionSnapshotsChurn {
     collection_name: String,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     stopped: CancellationToken,
 }
 
@@ -28,13 +28,13 @@ impl CollectionSnapshotsChurn {
     pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "collection-snapshot-drill".to_string();
         let vec_dim = 128;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let points_count = 10_000;
         CollectionSnapshotsChurn {
             collection_name,
             points_count,
             vec_dim,
-            payload_count,
+            keyword_variants,
             stopped,
         }
     }
@@ -65,7 +65,7 @@ impl Drill for CollectionSnapshotsChurn {
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
             )
@@ -86,12 +86,16 @@ impl Drill for CollectionSnapshotsChurn {
 
         // create snapshot
         let snapshot = create_collection_snapshot(client, &self.collection_name).await?;
+        let snapshot_name = snapshot
+            .snapshot_description
+            .ok_or_else(|| Invariant("Created snapshot has no description".to_string()))?
+            .name;
 
-        // number of snapshots before
+        // number of snapshots after creation
         let post_create_snapshot_count =
             count_collection_snapshots(client, &self.collection_name).await?;
 
-        // assert snapshot count before
+        // assert snapshot count after creation
         if post_create_snapshot_count != snapshot_count + 1 {
             return Err(Invariant(format!(
                 "Collection snapshot count is wrong {} vs {}",
@@ -100,8 +104,15 @@ impl Drill for CollectionSnapshotsChurn {
             )));
         }
 
+        // verify the new snapshot is actually listed by name, not just counted
+        let listed = list_collection_snapshots(client, &self.collection_name).await?;
+        if !listed.contains(&snapshot_name) {
+            return Err(Invariant(format!(
+                "Snapshot {snapshot_name} not in listing {listed:?}"
+            )));
+        }
+
         // delete snapshot
-        let snapshot_name = snapshot.snapshot_description.unwrap().name;
         delete_collection_snapshot(client, &self.collection_name, &snapshot_name).await?;
 
         // number of snapshots before
@@ -132,7 +143,7 @@ impl Drill for CollectionSnapshotsChurn {
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
             )

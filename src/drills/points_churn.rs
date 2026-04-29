@@ -4,8 +4,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_points, get_points_count, insert_points_batch, recreate_collection,
-    wait_index,
+    create_collection, delete_points, get_point_by_id, get_points_count, insert_points_batch,
+    recreate_collection,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Invariant;
@@ -19,7 +19,7 @@ pub struct PointsChurn {
     collection_name: String,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     stopped: CancellationToken,
 }
 
@@ -27,13 +27,13 @@ impl PointsChurn {
     pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "points-churn-drill".to_string();
         let vec_dim = 128;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let points_count = 10000;
         PointsChurn {
             collection_name,
             points_count,
             vec_dim,
-            payload_count,
+            keyword_variants,
             stopped,
         }
     }
@@ -62,14 +62,11 @@ impl Drill for PointsChurn {
             &self.collection_name,
             self.points_count,
             self.vec_dim,
-            self.payload_count,
+            self.keyword_variants,
             None,
             self.stopped.clone(),
         )
         .await?;
-
-        // waiting for green status
-        wait_index(client, &self.collection_name, self.stopped.clone()).await?;
 
         // assert point count
         let points_count = get_points_count(client, &self.collection_name).await?;
@@ -78,6 +75,16 @@ impl Drill for PointsChurn {
                 "Collection has wrong number of points after insert {} vs {}",
                 points_count, self.points_count
             )));
+        }
+
+        // verify a sample point was actually written, not just that the count looks right
+        if get_point_by_id(client, &self.collection_name, 0)
+            .await?
+            .is_none()
+        {
+            return Err(Invariant(
+                "Sample point 0 missing despite matching point count".to_string(),
+            ));
         }
 
         // delete all points

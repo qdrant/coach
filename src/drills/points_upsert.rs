@@ -4,7 +4,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, get_points_count, insert_points_batch, recreate_collection, wait_index,
+    create_collection, get_points_count, insert_points_batch, recreate_collection, retrieve_points,
+    wait_index,
 };
 use crate::common::coach_errors::CoachError;
 use crate::common::coach_errors::CoachError::Invariant;
@@ -18,7 +19,7 @@ pub struct PointsUpdate {
     collection_name: String,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     stopped: CancellationToken,
 }
 
@@ -26,13 +27,13 @@ impl PointsUpdate {
     pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "points-update-drill".to_string();
         let vec_dim = 128;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let points_count = 10000;
         PointsUpdate {
             collection_name,
             points_count,
             vec_dim,
-            payload_count,
+            keyword_variants,
             stopped,
         }
     }
@@ -60,7 +61,7 @@ impl Drill for PointsUpdate {
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
             )
@@ -84,13 +85,22 @@ impl Drill for PointsUpdate {
             )));
         }
 
-        // update points by upserting on same ids
+        // snapshot point 0's vector before the upsert
+        let before = retrieve_points(client, &self.collection_name, &[0]).await?;
+        let before_vectors = before
+            .result
+            .first()
+            .and_then(|p| p.vectors.clone())
+            .ok_or_else(|| Invariant("Sample point 0 missing vectors before upsert".to_string()))?;
+
+        // update points by upserting on same ids (insert_points_batch generates fresh
+        // random vectors per call - so the upsert should overwrite the previous content)
         insert_points_batch(
             client,
             &self.collection_name,
             self.points_count,
             self.vec_dim,
-            self.payload_count,
+            self.keyword_variants,
             None,
             self.stopped.clone(),
         )
@@ -103,6 +113,19 @@ impl Drill for PointsUpdate {
                 "Collection has wrong number of points after upsert {} vs {}",
                 points_count, self.points_count
             )));
+        }
+
+        // verify upsert actually wrote new content - random f32 vector collision is ~0
+        let after = retrieve_points(client, &self.collection_name, &[0]).await?;
+        let after_vectors = after
+            .result
+            .first()
+            .and_then(|p| p.vectors.clone())
+            .ok_or_else(|| Invariant("Sample point 0 missing vectors after upsert".to_string()))?;
+        if before_vectors == after_vectors {
+            return Err(Invariant(
+                "Upsert did not change vector content for point 0".to_string(),
+            ));
         }
 
         Ok(())
@@ -118,7 +141,7 @@ impl Drill for PointsUpdate {
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
             )

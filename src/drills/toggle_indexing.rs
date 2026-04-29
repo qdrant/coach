@@ -1,11 +1,10 @@
 use anyhow::Result;
-use qdrant_client::qdrant::CollectionStatus;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 use crate::args::Args;
 use crate::common::client::{
-    create_collection, delete_collection, disable_indexing, enable_indexing, get_collection_status,
+    create_collection, delete_collection, disable_indexing, enable_indexing, get_collection_info,
     get_points_count, insert_points_batch, search_points, wait_index,
 };
 use crate::common::coach_errors::CoachError;
@@ -21,7 +20,7 @@ pub struct ToggleIndexing {
     search_count: usize,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     stopped: CancellationToken,
 }
 
@@ -29,7 +28,7 @@ impl ToggleIndexing {
     pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "toggle-indexing-drill".to_string();
         let vec_dim = 128;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let search_count = 1000;
         let points_count = 20000; // large enough to trigger HNSW indexing
         ToggleIndexing {
@@ -37,7 +36,7 @@ impl ToggleIndexing {
             search_count,
             points_count,
             vec_dim,
-            payload_count,
+            keyword_variants,
             stopped,
         }
     }
@@ -71,7 +70,7 @@ impl Drill for ToggleIndexing {
             &self.collection_name,
             self.points_count,
             self.vec_dim,
-            self.payload_count,
+            self.keyword_variants,
             None,
             self.stopped.clone(),
         )
@@ -98,7 +97,7 @@ impl Drill for ToggleIndexing {
                 client,
                 &self.collection_name,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
             )
             .await?;
             // assert not empty
@@ -107,13 +106,21 @@ impl Drill for ToggleIndexing {
             }
         }
 
-        // waiting for green status
+        // waiting for green status (wait_index returns only once status is Green)
         wait_index(client, &self.collection_name, self.stopped.clone()).await?;
 
-        let collection_status = get_collection_status(client, &self.collection_name).await?;
-        if collection_status != CollectionStatus::Green {
+        // sanity check that the indexer made progress - indexed_vectors_count is
+        // documented as approximate, so don't require exact equality
+        let info = get_collection_info(client, &self.collection_name)
+            .await?
+            .ok_or_else(|| {
+                Invariant(format!("{} not found after indexing", self.collection_name))
+            })?;
+        let indexed = info.indexed_vectors_count.unwrap_or(0);
+        if indexed == 0 {
             return Err(Invariant(format!(
-                "Collection status is not Green after indexing but {collection_status:?}"
+                "Collection reports green but indexed_vectors_count is 0 (expected ~{})",
+                self.points_count
             )));
         }
 

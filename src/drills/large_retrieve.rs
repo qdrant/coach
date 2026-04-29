@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
@@ -19,7 +20,7 @@ pub struct LargeRetrieve {
     retrieve_count: usize,
     points_count: usize,
     vec_dim: usize,
-    payload_count: usize,
+    keyword_variants: usize,
     stopped: CancellationToken,
 }
 
@@ -27,7 +28,7 @@ impl LargeRetrieve {
     pub fn new(stopped: CancellationToken) -> Self {
         let collection_name = "large-retrieve-drill".to_string();
         let vec_dim = 1536;
-        let payload_count = 2;
+        let keyword_variants = 2;
         let retrieve_count = 100;
         let points_count = 2000;
         LargeRetrieve {
@@ -35,7 +36,7 @@ impl LargeRetrieve {
             retrieve_count,
             points_count,
             vec_dim,
-            payload_count,
+            keyword_variants,
             stopped,
         }
     }
@@ -63,7 +64,7 @@ impl Drill for LargeRetrieve {
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
             )
@@ -81,6 +82,7 @@ impl Drill for LargeRetrieve {
 
         // retrieve all points at once
         let ids: Vec<_> = (0..self.points_count).collect();
+        let expected_ids: HashSet<u64> = ids.iter().map(|i| *i as u64).collect();
 
         // retrieve `retrieve_count` times
         for _i in 0..self.retrieve_count {
@@ -93,6 +95,30 @@ impl Drill for LargeRetrieve {
                 return Err(Invariant(format!(
                     "Retrieve did not return all result {}",
                     response.result.len()
+                )));
+            }
+            // retrieve_points requests with_vectors(true) - verify they actually came back
+            if response.result[0].vectors.is_none() {
+                return Err(Invariant(
+                    "Retrieved point missing vectors despite with_vectors(true)".to_string(),
+                ));
+            }
+            // verify the returned id set is exactly the requested set (no dupes, no extras)
+            let returned: HashSet<u64> = response
+                .result
+                .iter()
+                .filter_map(|p| {
+                    p.id.as_ref().and_then(|i| match i.point_id_options {
+                        Some(qdrant_client::qdrant::point_id::PointIdOptions::Num(n)) => Some(n),
+                        _ => None,
+                    })
+                })
+                .collect();
+            if returned != expected_ids {
+                return Err(Invariant(format!(
+                    "Retrieved id set diverges from requested ({} unique vs {} expected)",
+                    returned.len(),
+                    expected_ids.len()
                 )));
             }
         }
@@ -110,7 +136,7 @@ impl Drill for LargeRetrieve {
                 &self.collection_name,
                 self.points_count,
                 self.vec_dim,
-                self.payload_count,
+                self.keyword_variants,
                 None,
                 self.stopped.clone(),
             )

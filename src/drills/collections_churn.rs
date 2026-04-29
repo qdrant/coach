@@ -12,8 +12,6 @@ use async_trait::async_trait;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::FieldType;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
 /// Drill that keeps on creating and deleting the same collections
@@ -64,8 +62,6 @@ impl Drill for CollectionsChurn {
             }
         }
 
-        sleep(Duration::from_secs(1)).await;
-
         // create new collections
         for i in 0..self.collection_count {
             if self.stopped.is_cancelled() {
@@ -85,7 +81,6 @@ impl Drill for CollectionsChurn {
                 self.stopped.clone(),
             )
             .await?;
-            // create field index (non-blocking)
             create_field_index(
                 client,
                 &collection_name,
@@ -93,10 +88,17 @@ impl Drill for CollectionsChurn {
                 FieldType::Keyword,
             )
             .await?;
-            let info = get_collection_info(client, &collection_name).await?;
-            if info.is_none() {
+            let info = get_collection_info(client, &collection_name)
+                .await?
+                .ok_or_else(|| {
+                    CoachError::Invariant(format!(
+                        "Collection info for {collection_name} was not found after it was created"
+                    ))
+                })?;
+            // verify the field index actually registered, not just that the API call succeeded
+            if !info.payload_schema.contains_key(KEYWORD_PAYLOAD_KEY) {
                 return Err(CoachError::Invariant(format!(
-                    "Collection info for {collection_name} was not found after it was created"
+                    "Field index for {KEYWORD_PAYLOAD_KEY} missing from {collection_name} payload_schema"
                 )));
             }
         }
@@ -108,6 +110,12 @@ impl Drill for CollectionsChurn {
             }
             let collection_name = format!("{}{}", self.base_collection_name, i);
             delete_collection(client, &collection_name).await?;
+            // verify the collection is actually gone
+            if client.collection_exists(&collection_name).await? {
+                return Err(CoachError::Invariant(format!(
+                    "{collection_name} still exists after delete"
+                )));
+            }
         }
 
         Ok(())
