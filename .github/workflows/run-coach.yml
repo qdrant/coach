@@ -63,7 +63,7 @@ jobs:
           ./coach-things.sh "$coaching_time" "$qdrant_version"
       - name: Send Notification
         if: failure() || cancelled()
-        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           payload: |
             {
