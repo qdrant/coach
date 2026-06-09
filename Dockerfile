@@ -26,7 +26,7 @@ RUN cargo build --release
 
 RUN mv target/release/coach /coach/coach
 
-FROM debian:12-slim
+FROM debian:13-slim
 ARG APP=/coach
 
 RUN apt-get update \
