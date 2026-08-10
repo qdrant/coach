@@ -6,19 +6,19 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.102"
-thiserror = "2.0.18"
-clap = { version = "4.6.1", features = ["derive"] }
+anyhow = "1.0.104"
+thiserror = "2.0.20"
+clap = { version = "4.6.6", features = ["derive"] }
 ctrlc = "3.5.2"
-futures = "0.3.32"
-async-trait = "0.1.89"
-qdrant-client = "1.18.0"
-rand = "0.10.1"
-tokio = { version = "1.52.3", features = ["full"] }
-tokio-util = "0.7"
-log = "0.4.32"
-env_logger = "0.11.10"
-hdrhistogram = "7.5.4"
+futures = "0.3.33"
+async-trait = "0.1.92"
+qdrant-client = "1.19.0"
+rand = "0.10.2"
+tokio = { version = "1.53.1", features = ["full"] }
+tokio-util = "0.7.19"
+log = "0.4.33"
+env_logger = "0.11.11"
+hdrhistogram = "7.6.0"
 
 [profile.release]
 lto = "fat"

@@ -7,18 +7,15 @@ use crate::common::generators::{
 use anyhow::Context;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
-use qdrant_client::qdrant::quantization_config::Quantization;
-use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
     CollectionInfo, CollectionStatus, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder,
     CreateSnapshotResponse, DeletePointsBuilder, DeleteSnapshotRequestBuilder, Distance, FieldType,
-    GetPointsBuilder, GetResponse, HnswConfigDiff, OptimizersConfigDiff, PointId, PointStruct,
-    QuantizationConfig, RetrievedPoint, ScalarQuantization, ScrollPointsBuilder, ScrollResponse,
+    GetPointsBuilder, GetResponse, HnswConfigDiffBuilder, OptimizersConfigDiff, PointId,
+    PointStruct, RetrievedPoint, ScalarQuantizationBuilder, ScrollPointsBuilder, ScrollResponse,
     SearchPointsBuilder, SearchResponse, SetPayloadPointsBuilder, UpdateCollectionBuilder,
-    UpsertPointsBuilder, VectorParams, VectorParamsMap, VectorsConfig, WriteOrdering,
+    UpsertPointsBuilder, VectorParamsBuilder, VectorsConfigBuilder, WriteOrdering,
 };
 use rand::rngs::SmallRng;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -407,54 +404,30 @@ pub async fn create_collection(
     vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
+    let mut hnsw_config = HnswConfigDiffBuilder::default().on_disk(args.hnsw_on_disk);
+    if let Some(max_indexing_threads) = args.max_indexing_threads {
+        hnsw_config = hnsw_config.max_indexing_threads(max_indexing_threads as u64);
+    }
+
+    let mut default_vector = VectorParamsBuilder::new(vec_dim as u64, Distance::Cosine)
+        .hnsw_config(hnsw_config)
+        .on_disk(args.vectors_on_disk);
+    if args.use_scalar_quantization {
+        // `ScalarQuantizationBuilder::default` uses Int8
+        default_vector = default_vector
+            .quantization_config(ScalarQuantizationBuilder::default().always_ram(true))
+    }
+
+    let mut vectors_config = VectorsConfigBuilder::default();
+    vectors_config.add_named_vector_params(DEFAULT_VECTOR_NAME, default_vector);
+    // unused vector to generate more complex config
+    vectors_config.add_named_vector_params(
+        UNUSED_VECTOR_NAME,
+        VectorParamsBuilder::new(vec_dim as u64, Distance::Cosine).on_disk(args.vectors_on_disk),
+    );
+
     let mut builder = CreateCollectionBuilder::new(collection_name)
-        .vectors_config(VectorsConfig {
-            config: Some(Config::ParamsMap(VectorParamsMap {
-                map: vec![
-                    (
-                        DEFAULT_VECTOR_NAME.to_string(),
-                        VectorParams {
-                            size: vec_dim as u64,
-                            distance: Distance::Cosine.into(),
-                            hnsw_config: Some(HnswConfigDiff {
-                                m: None,
-                                ef_construct: None,
-                                full_scan_threshold: None,
-                                max_indexing_threads: args.max_indexing_threads.map(|i| i as u64),
-                                on_disk: Some(args.hnsw_on_disk),
-                                payload_m: None,
-                                inline_storage: None,
-                            }),
-                            quantization_config: if args.use_scalar_quantization {
-                                Some(QuantizationConfig {
-                                    quantization: Some(Quantization::Scalar(ScalarQuantization {
-                                        r#type: 1, //Int8
-                                        quantile: None,
-                                        always_ram: Some(true),
-                                    })),
-                                })
-                            } else {
-                                None
-                            },
-                            on_disk: Some(args.vectors_on_disk),
-                            datatype: None,
-                            multivector_config: None,
-                        },
-                    ),
-                    (
-                        UNUSED_VECTOR_NAME.to_string(), // unused vector to generate more complex config
-                        VectorParams {
-                            size: vec_dim as u64,
-                            distance: Distance::Cosine.into(),
-                            on_disk: Some(args.vectors_on_disk),
-                            ..Default::default()
-                        },
-                    ),
-                ]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-            })),
-        })
+        .vectors_config(vectors_config)
         .replication_factor(args.replication_factor as u32)
         .write_consistency_factor(args.write_consistency_factor as u32)
         .on_disk_payload(args.payload_on_disk)
