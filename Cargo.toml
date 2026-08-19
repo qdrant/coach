@@ -20,6 +20,9 @@ log = "0.4.33"
 env_logger = "0.11.11"
 hdrhistogram = "7.6.0"
 
+[lints]
+workspace = true
+
 [workspace.lints.clippy]
 cast_lossless = "warn"
 doc_link_with_quotes = "warn"

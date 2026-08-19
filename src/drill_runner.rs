@@ -181,14 +181,14 @@ pub async fn run_drills(
                                 info!("{} is working again for {}", drill.name(), uri);
                             }
                             drill_reports.push(DrillReport {
-                                uri: uri.to_string(),
+                                uri: uri.clone(),
                                 duration: execution_start.elapsed(),
                                 error: None,
                             })
                         }
                         Err(e @ CoachError::Client(_) | e @ CoachError::Invariant(_)) => {
                             drill_reports.push(DrillReport {
-                                uri: uri.to_string(),
+                                uri: uri.clone(),
                                 duration: execution_start.elapsed(),
                                 error: Some(e.to_string()),
                             });
@@ -196,7 +196,7 @@ pub async fn run_drills(
                             if !last_errors.contains_key(uri) {
                                 warn!("{} started to fail for {} with {}", drill.name(), uri, e);
                             }
-                            last_errors.insert(uri.to_string(), e);
+                            last_errors.insert(uri.clone(), e);
                         }
                         Err(CoachError::Cancelled) => (),
                     };

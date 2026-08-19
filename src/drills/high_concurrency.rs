@@ -117,7 +117,7 @@ impl HighConcurrency {
         Ok(())
     }
 
-    fn pick_random<'a>(&self, clients: &'a [Qdrant], rng: &mut SmallRng) -> &'a Qdrant {
+    fn pick_random<'a>(clients: &'a [Qdrant], rng: &mut SmallRng) -> &'a Qdrant {
         let index = rng.random_range(0..clients.len());
         &clients[index]
     }
@@ -161,7 +161,7 @@ impl Drill for HighConcurrency {
         // lazy stream of futures - fork a per-future rng from the drill rng so concurrent
         // ops don't share state and stay deterministic per seed
         let query_stream = (0..self.number_iterations).map(|n| {
-            let target = self.pick_random(&target_clients, rng);
+            let target = Self::pick_random(&target_clients, rng);
             let future_rng = SmallRng::from_rng(rng);
             self.run_for_point(target, n as u64, future_rng)
         });

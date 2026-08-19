@@ -92,9 +92,7 @@ pub async fn delete_point_by_id(
         ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
-            "Failed to delete point_id {} for {}",
-            point_id,
-            collection_name
+            "Failed to delete point_id {point_id} for {collection_name}"
         ))
     } else {
         Ok(())
@@ -129,9 +127,7 @@ pub async fn set_payload(
     ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
-            "Failed to set payload on point_id {} for {}",
-            point_id,
-            collection_name
+            "Failed to set payload on point_id {point_id} for {collection_name}"
         ))
     } else {
         Ok(())
@@ -248,9 +244,7 @@ pub async fn delete_points(
         ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
-            "Failed to delete {} points for {}",
-            points_count,
-            collection_name
+            "Failed to delete {points_count} points for {collection_name}"
         ))
     } else {
         Ok(())
@@ -356,13 +350,10 @@ pub async fn get_collection_status(
     match info {
         Ok(Some(info)) => Ok(CollectionStatus::try_from(info.status)?),
         Ok(None) => Err(anyhow::anyhow!(
-            "Failed to get non-empty collection status for {}",
-            collection_name
+            "Failed to get non-empty collection status for {collection_name}"
         )),
         Err(e) => Err(anyhow::anyhow!(
-            "Failed to get collection for {} with error: {}",
-            collection_name,
-            e
+            "Failed to get collection for {collection_name} with error: {e}"
         )),
     }
 }

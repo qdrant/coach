@@ -37,10 +37,10 @@ impl CollectionConcurrentLifecycle {
         let parallelism = 20;
         CollectionConcurrentLifecycle {
             collection_name,
+            stopped,
             points_count,
             vec_dim,
             keyword_variants,
-            stopped,
             parallelism,
         }
     }
