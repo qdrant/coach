@@ -13,6 +13,14 @@ echo "Running for $RUN_TIME seconds"
 echo "QDRANT_HOST: $QDRANT_HOST"
 echo "QDRANT_VERSION: $QDRANT_VERSION"
 
+# Allow full image references (e.g. ghcr.io/qdrant/qdrant:my-branch) for branch validation.
+if [[ "$QDRANT_VERSION" == */* ]]; then
+  QDRANT_IMAGE="$QDRANT_VERSION"
+else
+  QDRANT_IMAGE="qdrant/qdrant:${QDRANT_VERSION}"
+fi
+echo "QDRANT_IMAGE: $QDRANT_IMAGE"
+
 # start qdrant docker
 docker run -d --rm \
            -p ${REST_PORT}:${REST_PORT} \
@@ -22,7 +30,7 @@ docker run -d --rm \
            -e QDRANT__STORAGE__COLLECTION_STRICT_MODE=true \
            -e QDRANT__FEATURE_FLAGS__ALL=true \
            -e QDRANT__CLUSTER__ENABLED=true \
-           --name qdrant_test qdrant/qdrant:"${QDRANT_VERSION}" ./qdrant --disable-telemetry --uri http://127.0.0.1:6335
+           --name qdrant_test "${QDRANT_IMAGE}" ./qdrant --disable-telemetry --uri http://127.0.0.1:6335
 
 trap stop_docker SIGINT
 trap stop_docker ERR
