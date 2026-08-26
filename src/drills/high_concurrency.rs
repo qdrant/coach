@@ -19,6 +19,22 @@ use rand::RngExt;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 
+/// Target number of concurrent workers per gRPC connection.
+///
+/// h2 (>= 0.4.16) enforces a per-connection budget on the framing overhead of small DATA
+/// frames: 25600 bytes, charged `256 - payload_len` for every buffered frame that does not
+/// carry END_STREAM, and refunded once the body is read. gRPC puts END_STREAM on the
+/// trailers, so every unary response is charged while it sits unread, and Qdrant's responses
+/// are tiny (~30 bytes, hence ~226 each). When the client falls behind the socket the
+/// backlog can exhaust the budget, and h2 tears the connection down with
+/// GOAWAY/ENHANCE_YOUR_CALM, which tonic surfaces as `ResourceExhausted`.
+///
+/// Coach hit exactly that against qdrant:dev in CI (runs 32577563283, 32644303822,
+/// 32858211174), starting with the h2 0.4.15 -> 0.4.16 bump that introduced the budget.
+/// Spreading the workers over more connections lowers the per-connection backlog without
+/// reducing the overall concurrency the drill is meant to apply.
+const WORKERS_PER_CONNECTION: usize = 50;
+
 /// Drill that performs operations on a collection with a high level of concurrency (without indexing).
 /// Run `concurrency_level` workers which repeatedly call APIs for inserting -> searching -> set payload -> updating -> getting one -> deleting
 /// The collection is created and populated with random data if it does not exist.
@@ -148,13 +164,14 @@ impl Drill for HighConcurrency {
         create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
 
         // workers will target random clients for all nodes to stress the cluster
+        // each client round-robins over a pool of connections so that no single HTTP/2
+        // connection carries all the workers (see `WORKERS_PER_CONNECTION`)
+        let pool_size = self.concurrency_level.div_ceil(WORKERS_PER_CONNECTION);
         let mut target_clients = vec![];
         for uri in &args.uris {
-            let target_client = Qdrant::new(get_config(
-                uri,
-                args.grpc_timeout_ms,
-                args.api_key.as_deref(),
-            ))?;
+            let mut config = get_config(uri, args.grpc_timeout_ms, args.api_key.as_deref());
+            config.set_pool_size(pool_size);
+            let target_client = Qdrant::new(config)?;
             target_clients.push(target_client);
         }
 
